@@ -1,0 +1,75 @@
+# ==========================================
+# 1. Environment & Sensitive Data
+# ==========================================
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+credentials.json
+
+# ==========================================
+# 2. Operating System Files
+# ==========================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# ==========================================
+# 3. Common Package Managers & Dependencies
+# ==========================================
+# Node.js
+node_modules/
+jspm_packages/
+.pnpm-store/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.env/
+
+# ==========================================
+# 4. IDEs and Editors
+# ==========================================
+# VS Code
+.vscode/
+!.vscode/extensions.json
+*.code-workspace
+
+# IntelliJ / JetBrains
+.idea/
+*.iws
+*.iml
+
+# Hardware / Editor crash logs
+*.log
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# ==========================================
+# 5. Build and Output Folders
+# ==========================================
+dist/
+build/
+out/
+bin/
+obj/
+.next/
+.nuxt/

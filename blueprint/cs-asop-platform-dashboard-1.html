@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CS-ASOP · Platform Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ground:#E9EDF1; --panel:#FFFFFF;
+  --ink:#12263A; --ink-2:#4A5D71; --ink-3:#8A9AAB; --rule:#D3DBE3;
+  --signal:#1F5FA9;
+  --ok:#1B7F79; --watch:#C07C05; --exposed:#B0372B;
+  --ok-bg:#E4F0EF; --watch-bg:#F8EEDA; --exposed-bg:#F6E3E0;
+  --display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1500px;margin:0 auto;padding:20px 24px 56px}
+
+/* masthead */
+.masthead{display:flex;flex-wrap:wrap;align-items:flex-end;gap:20px;border-bottom:2px solid var(--ink);padding-bottom:14px;margin-bottom:18px}
+.mast-id{flex:1 1 360px;min-width:290px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin:0 0 6px}
+.mast-id h1{font-family:var(--display);font-weight:700;font-size:clamp(25px,3.2vw,38px);letter-spacing:-.015em;line-height:1.02;margin:0}
+.mast-sub{color:var(--ink-2);margin:6px 0 0;max-width:58ch;font-size:13.5px}
+.mockup-flag{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;background:var(--ink);color:#fff;padding:3px 8px;margin-top:10px}
+.mast-meta{display:flex;gap:24px;font-family:var(--mono);font-size:11.5px;color:var(--ink-2)}
+.mast-meta div span{display:block;color:var(--ink-3);font-size:10px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:3px}
+
+/* view switch */
+.views{display:flex;gap:1px;background:var(--rule);border:1px solid var(--rule);margin-bottom:22px}
+.view-btn{flex:1;background:var(--panel);border:0;padding:12px 18px;text-align:left;cursor:pointer;font:inherit;color:var(--ink-2);transition:background .15s}
+.view-btn:hover{background:#F5F8FA}
+.view-btn.on{background:var(--ink);color:#fff}
+.view-btn b{display:block;font-family:var(--display);font-weight:700;font-size:16px;letter-spacing:-.005em;color:inherit}
+.view-btn span{font-size:11.5px;color:var(--ink-3)}
+.view-btn.on span{color:#A8BACB}
+.view-btn:focus-visible{outline:2px solid var(--signal);outline-offset:-2px}
+.view{display:none}
+.view.on{display:block}
+
+/* figures */
+.figures{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule);margin-bottom:22px}
+.fig{background:var(--panel);padding:16px 18px}
+.fig .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3);margin-bottom:8px}
+.fig .v{font-family:var(--display);font-weight:700;font-size:36px;line-height:1;letter-spacing:-.02em}
+.fig .v small{font-size:17px;font-weight:600;color:var(--ink-2);margin-left:2px}
+.fig .n{font-size:12px;color:var(--ink-2);margin-top:7px}
+.fig.alert .v{color:var(--exposed)}
+.fig.warn .v{color:var(--watch)}
+
+/* section headers */
+.sec-head{display:flex;align-items:baseline;gap:12px;margin:0 0 10px;flex-wrap:wrap}
+.sec-head h2{font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:.05em;text-transform:uppercase;margin:0}
+.sec-head p{margin:0;font-size:12.5px;color:var(--ink-2)}
+
+/* platform strip */
+.strip{display:grid;grid-template-columns:repeat(9,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule);margin-bottom:24px}
+.tile{background:var(--panel);padding:12px 12px 10px;text-align:left;border:0;cursor:pointer;font:inherit;color:inherit;transition:background .15s}
+.tile:hover{background:#F5F8FA}
+.tile.on{background:var(--ink);color:#fff}
+.tile.on .t-name{color:#fff}
+.tile.on .t-vendor{color:#A8BACB}
+.tile:focus-visible{outline:2px solid var(--signal);outline-offset:-2px}
+.t-code{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--ink-3)}
+.tile.on .t-code{color:#7E93A8}
+.t-name{font-family:var(--display);font-weight:700;font-size:16px;letter-spacing:-.01em;margin:3px 0 1px}
+.t-vendor{font-size:10.5px;color:var(--ink-3);margin-bottom:10px;min-height:14px}
+.t-score{display:flex;align-items:baseline;gap:6px}
+.t-score b{font-family:var(--mono);font-weight:600;font-size:22px;line-height:1}
+.t-trend{font-family:var(--mono);font-size:10.5px}
+.t-bar{height:3px;background:var(--rule);margin-top:9px;position:relative;overflow:hidden}
+.t-bar i{position:absolute;left:0;top:0;bottom:0;width:0;transition:width .9s cubic-bezier(.2,.7,.2,1)}
+.s-ok{color:var(--ok)} .s-watch{color:var(--watch)} .s-exposed{color:var(--exposed)}
+.b-ok{background:var(--ok)} .b-watch{background:var(--watch)} .b-exposed{background:var(--exposed)}
+
+/* generic panel */
+.panel{background:var(--panel);border:1px solid var(--rule);padding:18px 20px 20px;margin-bottom:22px}
+.two{display:grid;grid-template-columns:1.15fr 1fr;gap:20px;margin-bottom:22px}
+.two > .panel{margin-bottom:0}
+
+/* quadrant */
+.plot-frame{position:relative;margin:22px 0 0 46px}
+.plot{position:relative;aspect-ratio:1.32/1;border-left:1.5px solid var(--ink);border-bottom:1.5px solid var(--ink);
+  background:linear-gradient(to right,var(--rule) 1px,transparent 1px) 0 0/25% 100%,linear-gradient(to top,var(--rule) 1px,transparent 1px) 0 100%/100% 25%}
+.zone{position:absolute;left:0;top:0;width:66.6%;height:50%;background:repeating-linear-gradient(-45deg,rgba(176,55,43,.11) 0 6px,transparent 6px 12px);border-right:1px dashed rgba(176,55,43,.45);border-bottom:1px dashed rgba(176,55,43,.45)}
+.zone-label{position:absolute;left:12px;top:12px;max-width:200px;font-family:var(--display);font-weight:700;font-size:14px;letter-spacing:.03em;text-transform:uppercase;color:var(--exposed)}
+.zone-label span{display:block;font-family:var(--body);font-weight:400;font-size:11.5px;letter-spacing:0;text-transform:none;color:#8A4B43;margin-top:3px}
+.dot{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;display:grid;place-items:center;font-family:var(--mono);font-size:9.5px;font-weight:600;color:#fff;cursor:pointer;border:0;padding:0;transition:transform .6s cubic-bezier(.2,.7,.2,1),opacity .6s ease,box-shadow .15s;transform:scale(.2);opacity:0}
+.plot.ready .dot{transform:scale(1);opacity:1}
+.dot:hover,.dot.on{box-shadow:0 0 0 4px rgba(18,38,58,.16);z-index:5}
+.dot.on{outline:2px solid var(--ink);outline-offset:2px}
+.d-ok{background:var(--ok)} .d-watch{background:var(--watch)} .d-exposed{background:var(--exposed)}
+.ax-y{position:absolute;left:-46px;top:0;bottom:0;width:40px;display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end;font-family:var(--mono);font-size:10px;color:var(--ink-3)}
+.ax-x{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--ink-3);margin-top:6px}
+.ax-title{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);margin-top:10px;text-align:center}
+.ax-title-y{position:absolute;left:-46px;top:50%;transform:rotate(-90deg) translateX(50%);transform-origin:left center;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);white-space:nowrap}
+
+/* exposure list */
+.exp{list-style:none;margin:18px 0 0;padding:0}
+.exp li{padding:11px 0;border-bottom:1px solid var(--rule)}
+.exp li:last-child{border-bottom:0}
+.exp-top{display:flex;align-items:baseline;gap:10px}
+.exp-n{font-family:var(--mono);font-weight:600;font-size:19px;min-width:62px}
+.exp-t{flex:1;font-size:13px}
+.exp-meta{display:flex;gap:10px;align-items:center;margin-top:6px;padding-left:72px}
+.owner{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;padding:2px 7px;border:1px solid var(--rule);color:var(--ink-2)}
+.owner.ext{border-color:#C7A9A3;background:var(--exposed-bg);color:#8A4B43}
+.exp-bar{flex:1;height:4px;background:var(--rule);position:relative}
+.exp-bar i{position:absolute;inset:0 auto 0 0;background:var(--ink);width:0;transition:width .9s cubic-bezier(.2,.7,.2,1)}
+
+/* drilldown */
+.drill{background:var(--panel);border:1px solid var(--rule);padding:18px 20px 8px;margin-bottom:24px}
+.drill-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:14px;border-bottom:1.5px solid var(--ink);padding-bottom:12px}
+.drill-head h2{font-family:var(--display);font-weight:700;font-size:22px;margin:0;letter-spacing:-.01em}
+.chip{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;padding:3px 9px;border:1px solid var(--rule);color:var(--ink-2)}
+.drill-head .hint{margin-left:auto;font-size:11.5px;color:var(--ink-3)}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr)}
+.metric{padding:15px 18px 15px 0;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.metric:nth-child(4n){border-right:0}
+.metric .m-k{font-size:11.5px;color:var(--ink-2);margin-bottom:7px;min-height:32px}
+.metric .m-v{font-family:var(--mono);font-weight:600;font-size:25px;line-height:1}
+.metric .m-v small{font-size:13px;color:var(--ink-3);font-weight:400;margin-left:3px}
+.metric .m-t{font-family:var(--mono);font-size:10.5px;margin-top:6px;color:var(--ink-3)}
+
+/* delivery cards */
+.deliv{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule)}
+.card{background:var(--panel);padding:15px 16px 17px;display:flex;flex-direction:column}
+.card h3{font-family:var(--display);font-weight:700;font-size:15px;margin:0 0 4px}
+.card .stage{font-family:var(--mono);font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3);margin-bottom:9px}
+.card p{margin:0 0 14px;font-size:12px;color:var(--ink-2);flex:1}
+.blocker{font-size:11.5px;padding:8px 10px;border-left:2px solid var(--exposed);background:var(--exposed-bg);color:#7E4239}
+.blocker b{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:2px;color:var(--exposed)}
+.blocker.clear{border-left-color:var(--ok);background:var(--ok-bg);color:#1B5F5B}
+.blocker.clear b{color:var(--ok)}
+
+/* ---------- OPERATIONS ---------- */
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+thead th{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);text-align:left;padding:0 10px 9px 0;border-bottom:1.5px solid var(--ink);font-weight:500;white-space:nowrap}
+thead th.num{text-align:right}
+tbody td{padding:9px 10px 9px 0;border-bottom:1px solid var(--rule);vertical-align:middle}
+tbody tr.dim{opacity:.32}
+.node{font-family:var(--mono);font-weight:500;font-size:12.5px;white-space:nowrap}
+.role{font-size:11px;color:var(--ink-3);white-space:nowrap}
+.pf{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--ink-3)}
+.gauge{display:flex;align-items:center;gap:8px;min-width:110px}
+.gauge .track{flex:1;height:5px;background:var(--rule);position:relative;min-width:52px}
+.gauge .track i{position:absolute;inset:0 auto 0 0;width:0;transition:width .8s cubic-bezier(.2,.7,.2,1)}
+.gauge .pc{font-family:var(--mono);font-size:11.5px;font-weight:500;width:34px;text-align:right}
+.pill{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;white-space:nowrap;border:1px solid transparent}
+.pill.up{background:var(--ok-bg);color:var(--ok);border-color:#B9D8D5}
+.pill.deg{background:var(--watch-bg);color:var(--watch);border-color:#E4CE9A}
+.pill.down{background:var(--exposed-bg);color:var(--exposed);border-color:#DDB4AD}
+.right{text-align:right}
+.mono{font-family:var(--mono);font-size:11.5px}
+.warnpc{color:var(--watch);font-weight:500}
+.badpc{color:var(--exposed);font-weight:600}
+
+/* uptime strip */
+.uptime-row{display:grid;grid-template-columns:150px 1fr 88px;gap:14px;align-items:center;padding:9px 0;border-bottom:1px solid var(--rule)}
+.uptime-row:last-child{border-bottom:0}
+.uptime-row .un{font-family:var(--display);font-weight:700;font-size:14px}
+.uptime-row .un span{display:block;font-family:var(--mono);font-weight:400;font-size:9.5px;letter-spacing:.1em;color:var(--ink-3)}
+.days{display:flex;gap:2px;height:22px}
+.days i{flex:1;background:var(--ok);border-radius:1px;transition:opacity .15s}
+.days i.deg{background:var(--watch)}
+.days i.down{background:var(--exposed)}
+.days i:hover{opacity:.6}
+.uptime-row .up-pc{font-family:var(--mono);font-size:13px;font-weight:600;text-align:right}
+
+/* license */
+.lic{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule)}
+.lic-cell{background:var(--panel);padding:15px 17px 17px}
+.lic-cell h3{font-family:var(--display);font-weight:700;font-size:15px;margin:0 0 2px}
+.lic-cell .lm{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-bottom:12px}
+.lic-num{display:flex;align-items:baseline;gap:6px;margin-bottom:9px}
+.lic-num b{font-family:var(--mono);font-weight:600;font-size:24px;line-height:1}
+.lic-num span{font-family:var(--mono);font-size:12px;color:var(--ink-3)}
+.lic-track{height:6px;background:var(--rule);position:relative;margin-bottom:9px}
+.lic-track i{position:absolute;inset:0 auto 0 0;width:0;transition:width 1s cubic-bezier(.2,.7,.2,1)}
+.lic-note{font-size:11.5px;color:var(--ink-2)}
+.lic-note.bad{color:var(--exposed);font-weight:500}
+.lic-cell.none .lic-num b{color:var(--ink-3)}
+
+/* access */
+.access{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule);margin-bottom:0}
+.acc{background:var(--panel);padding:15px 17px}
+.acc .k{font-family:var(--mono);font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3);margin-bottom:8px}
+.acc .v{font-family:var(--display);font-weight:700;font-size:30px;line-height:1}
+.acc .n{font-size:11.5px;color:var(--ink-2);margin-top:6px}
+
+footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--rule);font-family:var(--mono);font-size:10.5px;color:var(--ink-3);display:flex;flex-wrap:wrap;gap:20px}
+
+@media (max-width:1180px){
+  .figures{grid-template-columns:repeat(2,1fr)}
+  .strip{grid-template-columns:repeat(3,1fr)}
+  .two{grid-template-columns:1fr}
+  .metrics{grid-template-columns:repeat(2,1fr)}
+  .metric:nth-child(4n){border-right:1px solid var(--rule)}
+  .metric:nth-child(2n){border-right:0}
+  .deliv{grid-template-columns:repeat(2,1fr)}
+  .lic{grid-template-columns:repeat(2,1fr)}
+  .views{flex-direction:column}
+}
+@media (max-width:760px){
+  .wrap{padding:16px 14px 40px}
+  .figures,.lic,.access{grid-template-columns:1fr}
+  .strip{grid-template-columns:repeat(2,1fr)}
+  .metrics{grid-template-columns:1fr}
+  .metric{border-right:0 !important}
+  .deliv{grid-template-columns:1fr}
+  .table-scroll{overflow-x:auto}
+  .table-scroll table{min-width:760px}
+  .uptime-row{grid-template-columns:110px 1fr 62px;gap:8px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none !important}
+  .plot .dot{transform:scale(1);opacity:1}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+  <div class="mast-id">
+    <p class="eyebrow">Cyber Security · Access Security &amp; Observability Platform</p>
+    <h1>Platform Dashboard</h1>
+    <p class="mast-sub">Nine owned platforms. One view for the risk story, one for the evidence behind it.</p>
+    <span class="mockup-flag">Mockup · illustrative data</span>
+  </div>
+  <div class="mast-meta">
+    <div><span>Period</span>Aug 2026</div>
+    <div><span>Domains</span>IT + Telco</div>
+    <div><span>Operated by</span>SecOps</div>
+    <div><span>Refreshed</span>05 min ago</div>
+  </div>
+</header>
+
+<div class="views" role="tablist" aria-label="Dashboard views">
+  <button class="view-btn on" id="vb-assurance" role="tab" aria-selected="true" aria-controls="v-assurance">
+    <b>Assurance &amp; Coverage</b><span>For leadership — is the estate actually protected</span>
+  </button>
+  <button class="view-btn" id="vb-ops" role="tab" aria-selected="false" aria-controls="v-ops">
+    <b>Platform Operations</b><span>Capacity, services, sessions, licence occupancy</span>
+  </button>
+</div>
+
+<div class="sec-head">
+  <h2>Platform portfolio</h2>
+  <p>Selecting a platform filters both views.</p>
+</div>
+<div class="strip" id="strip" role="tablist" aria-label="Platform portfolio"></div>
+
+<!-- ================= ASSURANCE ================= -->
+<section class="view on" id="v-assurance" role="tabpanel" aria-labelledby="vb-assurance">
+
+  <div class="figures">
+    <div class="fig"><div class="k">Portfolio availability</div><div class="v">99.5<small>%</small></div><div class="n">All nine platforms inside SLA. No full outage this period.</div></div>
+    <div class="fig alert"><div class="k">Estate under full assurance</div><div class="v">58<small>%</small></div><div class="n">Assets covered by every control they are in scope for.</div></div>
+    <div class="fig alert"><div class="k">Platforms up but blind</div><div class="v">5<small>/9</small></div><div class="n">Healthy service, coverage below the 80% threshold.</div></div>
+    <div class="fig"><div class="k">Assets missing ≥1 control</div><div class="v">1,284</div><div class="n">62% sit with counterpart teams, not CS-ASOP.</div></div>
+  </div>
+
+  <div class="two">
+    <section class="panel">
+      <div class="sec-head"><h2>Availability against coverage</h2><p>Where the real exposure sits.</p></div>
+      <div class="plot-frame">
+        <div class="ax-title-y">Availability</div>
+        <div class="ax-y" aria-hidden="true"><span>100.0%</span><span>99.5%</span><span>99.0%</span><span>98.5%</span><span>98.0%</span></div>
+        <div class="plot" id="plot">
+          <div class="zone" aria-hidden="true"></div>
+          <div class="zone-label" aria-hidden="true">Up, but blind<span>Service is healthy. The estate is not covered.</span></div>
+        </div>
+        <div class="ax-x" aria-hidden="true"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
+        <div class="ax-title">Estate coverage</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="sec-head"><h2>What is not covered</h2><p>Ranked by asset count.</p></div>
+      <ul class="exp" id="exposure"></ul>
+    </section>
+  </div>
+
+  <section class="drill">
+    <div class="drill-head">
+      <h2 id="d-name">—</h2>
+      <span class="chip" id="d-vendor">—</span>
+      <span class="chip" id="d-status">—</span>
+      <span class="hint">Coverage metrics for the selected platform</span>
+    </div>
+    <div class="metrics" id="metrics"></div>
+  </section>
+
+  <div class="sec-head"><h2>In flight and what is blocking it</h2><p>Dependencies outside CS-ASOP are marked.</p></div>
+  <section class="deliv">
+    <article class="card"><h3>ITDR</h3><div class="stage">New capability · budget cycle</div><p>Identity threat detection over AD, Entra and privileged sessions.</p><div class="blocker"><b>Blocked by</b>Business case pending postmortem sign-off.</div></article>
+    <article class="card"><h3>Service account governance</h3><div class="stage">Scoping</div><p>Usage attribution, ownership continuity, non-static credentials for app-to-app.</p><div class="blocker"><b>Blocked by</b>Not covered by current IGA or PAM licensing.</div></article>
+    <article class="card"><h3>PAM asset onboarding</h3><div class="stage">Ongoing · 61% complete</div><p>Remaining server and cloud estate under vaulted, recorded access.</p><div class="blocker"><b>Blocked by</b>Asset handover from OSPLA, Datacom and CCOE.</div></article>
+    <article class="card"><h3>TIP consolidation</h3><div class="stage">Vendor evaluation</div><p>Single intel dashboard, beyond IOC-only subscription.</p><div class="blocker"><b>Blocked by</b>Add-on licensing not yet approved.</div></article>
+    <article class="card"><h3>Patch visibility</h3><div class="stage">Dependency only</div><p>Reporting visibility into patch state. Execution stays with infrastructure operations.</p><div class="blocker clear"><b>Status</b>Read-only feed agreed. Integration scheduled.</div></article>
+  </section>
+</section>
+
+<!-- ================= OPERATIONS ================= -->
+<section class="view" id="v-ops" role="tabpanel" aria-labelledby="vb-ops">
+
+  <div class="figures">
+    <div class="fig"><div class="k">Nodes monitored</div><div class="v" id="o-nodes">—</div><div class="n">Across nine platforms, IT and Telco.</div></div>
+    <div class="fig warn"><div class="k">Services not fully up</div><div class="v" id="o-svc">—</div><div class="n">Degraded or down, of <span id="o-svc-total">—</span> monitored.</div></div>
+    <div class="fig alert"><div class="k">Capacity alerts</div><div class="v" id="o-cap">—</div><div class="n">Nodes above 85% on CPU, memory or disk.</div></div>
+    <div class="fig alert"><div class="k">Nearest licence exhaustion</div><div class="v">41<small>d</small></div><div class="n">SASE seats at 91%. Procurement lead time is 60 days.</div></div>
+  </div>
+
+  <section class="panel">
+    <div class="sec-head"><h2>Node capacity</h2><p id="cap-note">All platforms. Select a platform above to filter.</p></div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr>
+          <th>Node</th><th>Platform</th><th>CPU</th><th>Memory</th><th>Disk</th>
+          <th class="num">Disk headroom</th><th class="num">Uptime</th><th>State</th>
+        </tr></thead>
+        <tbody id="nodes"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="two">
+    <section class="panel">
+      <div class="sec-head"><h2>Critical services</h2><p>Process-level state, not host ping.</p></div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Service</th><th>Host</th><th>State</th><th class="num">Last restart</th></tr></thead>
+          <tbody id="services"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="sec-head"><h2>Availability, last 30 days</h2><p>One bar per day. Amber is degraded, red is down.</p></div>
+      <div id="uptime"></div>
+    </section>
+  </div>
+
+  <div class="sec-head"><h2>Who is on the platforms right now</h2><p>Administrative and privileged access, live.</p></div>
+  <section class="access" style="margin-bottom:22px">
+    <div class="acc"><div class="k">Admin users signed in</div><div class="v">47</div><div class="n">Peak today 83, peak this month 112.</div></div>
+    <div class="acc"><div class="k">Privileged sessions via PAM</div><div class="v">19</div><div class="n">All recorded. 3 running over 4 hours.</div></div>
+    <div class="acc"><div class="k">Sessions bypassing PAM</div><div class="v" style="color:var(--exposed)">6</div><div class="n">Direct logins on non-onboarded hosts.</div></div>
+    <div class="acc"><div class="k">Sessions from Telco domain</div><div class="v">21</div><div class="n">Of which 4 are third-party engineers.</div></div>
+    <div class="acc"><div class="k">Outside business hours, 30d</div><div class="v">214</div><div class="n">31 without a matching change ticket.</div></div>
+    <div class="acc"><div class="k">Break-glass account in use</div><div class="v" style="color:var(--ok)">0</div><div class="n">Last used 12 Aug, reviewed and closed.</div></div>
+  </section>
+
+  <div class="sec-head"><h2>Licence occupancy</h2><p>Where consumption becomes a budget decision.</p></div>
+  <section class="lic" id="licences"></section>
+</section>
+
+<footer>
+  <span>CS-ASOP Platform Dashboard · Mockup for review</span>
+  <span>Coverage threshold 80%</span>
+  <span>Capacity alert threshold 85%</span>
+  <span>Availability SLA 99.0%</span>
+  <span>Figures are illustrative and not production data</span>
+</footer>
+</div>
+
+<script>
+const PLATFORMS = [
+ { code:"PAM", name:"PAM", vendor:"Delinea Secret Server", avail:99.8, cov:61, delta:+4,
+   metrics:[{k:"Privileged accounts vaulted",v:"61",u:"%",t:"1,842 of 3,020"},{k:"Standing privilege outside vault",v:"268",u:"",t:"↓ 41 vs Jul"},{k:"Session recording coverage",v:"88",u:"%",t:"Target 100%"},{k:"Break-glass account used",v:"2",u:"×",t:"Both reviewed"}],
+   nodes:[["dlt-app-01","Application",42,68,55,null,118],["dlt-app-02","Application",39,71,54,null,118],["dlt-sql-01","SQL AlwaysOn primary",61,88,79,61,202],["dlt-dr-01","DR replica",12,33,51,null,202]],
+   services:[["Secret Server app pool","dlt-app-01","up","14 Jun"],["Distributed Engine","dlt-app-02","up","14 Jun"],["Session recording service","dlt-app-01","deg","23 Aug"],["SQL Server Agent","dlt-sql-01","up","04 Feb"]],
+   incidents:{} },
+
+ { code:"IGA", name:"IGA", vendor:"Saviynt", avail:99.5, cov:74, delta:+2,
+   metrics:[{k:"Access recertification complete",v:"74",u:"%",t:"Cycle closes 30 Sep"},{k:"Service accounts without owner",v:"147",u:"",t:"↑ 12 vs Jul"},{k:"Segregation-of-duty conflicts",v:"38",u:"",t:"9 open past 30 days"},{k:"Joiner-mover-leaver in SLA",v:"91",u:"%",t:"Leaver is the miss"}],
+   nodes:[["svy-app-01","Application",55,74,48,null,74],["svy-app-02","Application",51,76,47,null,74],["svy-db-01","Database",68,82,71,94,161],["svy-job-01","Job scheduler",77,69,44,null,29]],
+   services:[["Saviynt web tier","svy-app-01","up","11 Jul"],["Import job scheduler","svy-job-01","deg","26 Jul"],["Certification engine","svy-app-02","up","11 Jul"],["Connector — AD","svy-job-01","up","26 Jul"]],
+   incidents:{17:"deg"} },
+
+ { code:"DIR", name:"Directory", vendor:"AD / Entra ID", avail:99.9, cov:88, delta:+1,
+   metrics:[{k:"Tier-0 accounts fully controlled",v:"94",u:"%",t:"6 exceptions logged"},{k:"Stale privileged accounts",v:"57",u:"",t:"No login over 90 days"},{k:"Service accounts used interactively",v:"31",u:"",t:"Backdoor login risk"},{k:"Non-domain-joined on AD auth",v:"193",u:"",t:"Mostly Linux"}],
+   nodes:[["dc-it-01","Domain controller",22,47,38,null,241],["dc-it-02","Domain controller",25,49,39,null,241],["dc-tel-01","Domain controller",31,52,41,null,187],["dc-tel-02","Domain controller",29,51,42,null,187],["aadc-01","Entra Connect",18,44,36,null,96]],
+   services:[["NTDS","dc-it-01","up","27 Dec"],["DNS Server","dc-it-02","up","27 Dec"],["Entra Connect sync","aadc-01","up","20 May"],["KDC","dc-tel-01","up","19 Feb"]],
+   incidents:{} },
+
+ { code:"MFA", name:"MFA", vendor:"Enterprise MFA", avail:99.9, cov:69, delta:+6,
+   metrics:[{k:"Applications behind MFA",v:"69",u:"%",t:"Legacy apps pending"},{k:"Privileged logins with MFA",v:"97",u:"%",t:"Target 100%"},{k:"Push-fatigue events flagged",v:"14",u:"",t:"All resolved"},{k:"Bypass exceptions active",v:"23",u:"",t:"11 expired, not revoked"}],
+   nodes:[["mfa-app-01","Application",34,58,33,null,133],["mfa-app-02","Application",36,57,33,null,133],["mfa-db-01","Database",44,66,58,null,133]],
+   services:[["Authentication service","mfa-app-01","up","13 Apr"],["Push notification relay","mfa-app-02","up","13 Apr"],["RADIUS listener","mfa-app-01","up","13 Apr"]],
+   incidents:{} },
+
+ { code:"ZTA", name:"SASE / ZTNA", vendor:"Zero-trust access", avail:98.7, cov:82, delta:0,
+   metrics:[{k:"Endpoints enrolled",v:"82",u:"%",t:"Contractors are the gap"},{k:"Tunnel availability",v:"98.7",u:"%",t:"Two regional degradations"},{k:"Policy bypass attempts",v:"64",u:"",t:"All blocked"},{k:"Legacy VPN sessions left",v:"310",u:"",t:"Decommission by Q4"}],
+   nodes:[["sase-gw-jkt","Gateway — Jakarta",71,78,40,null,52],["sase-gw-sby","Gateway — Surabaya",58,63,38,null,52],["sase-gw-mks","Gateway — Makassar",47,55,37,null,9],["sase-ctl-01","Controller",29,48,44,null,110]],
+   services:[["Tunnel terminator","sase-gw-jkt","up","03 Jul"],["Tunnel terminator","sase-gw-mks","deg","15 Aug"],["Policy engine","sase-ctl-01","up","06 May"],["Posture check service","sase-ctl-01","up","06 May"]],
+   incidents:{8:"down",9:"deg",22:"deg"} },
+
+ { code:"SIE", name:"SIEM", vendor:"Splunk + in-house", avail:99.4, cov:57, delta:-3,
+   metrics:[{k:"Log source coverage — IT",v:"71",u:"%",t:"↓ 2 vs Jul"},{k:"Log source coverage — Telco",v:"43",u:"%",t:"Largest single gap"},{k:"Sources silent over 24h",v:"412",u:"",t:"Not alerted on today"},{k:"Detection coverage vs MITRE",v:"52",u:"%",t:"Identity tactics weakest"}],
+   nodes:[["shc-01","Search head",66,79,62,null,63],["shc-02","Search head",63,81,61,null,63],["idx-01","Indexer",74,84,87,34,140],["idx-02","Indexer",76,85,89,28,140],["idx-03","Indexer",71,82,84,41,140],["idx-04","Indexer",69,80,76,66,21],["cm-01","Cluster master",21,41,33,null,140],["hf-tel-01","Heavy forwarder — Telco",58,62,45,null,7]],
+   services:[["splunkd — indexing","idx-02","deg","03 Aug"],["splunkd — search","shc-01","up","22 Jun"],["Ingest pipeline — Telco","hf-tel-01","down","17 Aug"],["Scheduled search runner","shc-02","up","22 Jun"],["In-house log collector","hf-tel-01","deg","17 Aug"]],
+   incidents:{5:"deg",6:"deg",19:"down",20:"deg",26:"deg"} },
+
+ { code:"SOA", name:"SOAR", vendor:"Orchestration", avail:99.6, cov:45, delta:+5,
+   metrics:[{k:"Use cases automated",v:"45",u:"%",t:"18 of 40 playbooks live"},{k:"Mean containment time",v:"22",u:"min",t:"Down from 51 min"},{k:"Playbook failure rate",v:"6",u:"%",t:"Mostly API timeouts"},{k:"Analyst hours returned",v:"310",u:"h",t:"This quarter"}],
+   nodes:[["soar-app-01","Application",38,61,42,null,88],["soar-wrk-01","Worker",52,67,39,null,88]],
+   services:[["Playbook engine","soar-app-01","up","28 May"],["Worker queue","soar-wrk-01","up","28 May"],["Connector — Splunk","soar-app-01","deg","17 Aug"]],
+   incidents:{19:"deg"} },
+
+ { code:"ANS", name:"Ansible", vendor:"Automation / hardening", avail:99.9, cov:66, delta:+3,
+   metrics:[{k:"Hosts under configuration control",v:"66",u:"%",t:"New builds drift first"},{k:"Hardening baseline drift",v:"124",u:"",t:"Hosts off baseline"},{k:"Automated remediation success",v:"93",u:"%",t:"Stable"},{k:"Manual change requests",v:"78",u:"",t:"↓ 22 vs Jul"}],
+   nodes:[["aap-ctl-01","Controller",27,54,47,null,171],["aap-exec-01","Execution node",44,58,43,null,171],["aap-exec-02","Execution node",41,56,42,null,35]],
+   services:[["Automation controller","aap-ctl-01","up","06 Mar"],["Execution environment","aap-exec-01","up","06 Mar"],["Inventory sync","aap-ctl-01","up","06 Mar"]],
+   incidents:{} },
+
+ { code:"TIP", name:"Threat Intel", vendor:"Anomali + Recorded Future", avail:99.2, cov:52, delta:+1,
+   metrics:[{k:"Intel operationalised",v:"52",u:"%",t:"IOC subscription only"},{k:"Feed freshness",v:"4",u:"h",t:"Within tolerance"},{k:"IOCs pushed to FW / WAF / XDR",v:"18.4",u:"k",t:"Automated"},{k:"Intel platforms in use",v:"2",u:"",t:"Consolidation proposed"}],
+   nodes:[["tip-app-01","Application",33,59,51,null,97],["tip-db-01","Database",48,72,68,120,97]],
+   services:[["Feed ingest","tip-app-01","up","19 May"],["IOC export — firewall","tip-app-01","up","19 May"],["IOC export — WAF","tip-app-01","deg","21 Aug"]],
+   incidents:{24:"deg",25:"deg"} }
+];
+
+const EXPOSURE = [
+ {n:412,t:"Servers not sending logs to SIEM — Telco domain",owner:"Datacom",ext:true},
+ {n:268,t:"Privileged accounts with standing access outside the vault",owner:"CS-ASOP",ext:false},
+ {n:193,t:"Servers not domain-joined but authenticating with AD service accounts",owner:"OSPLA",ext:true},
+ {n:147,t:"Service accounts with no named owner",owner:"App owners",ext:true},
+ {n:124,t:"Hosts drifted from hardening baseline",owner:"CS-ASOP",ext:false},
+ {n:96,t:"Cloud workloads absent from PAM onboarding",owner:"CCOE",ext:true},
+ {n:44,t:"Applications not yet behind MFA",owner:"App owners",ext:true}
+];
+
+const LICENCES = [
+ {code:"ZTA",p:"SASE / ZTNA",m:"User seats",used:6400,total:7000,unit:"seats",note:"41 days to exhaustion at current growth. Procurement lead time 60 days.",bad:true},
+ {code:"SIE",p:"Splunk",m:"Daily ingest",used:780,total:900,unit:"GB/day",note:"3 soft violations in 30 days. Telco onboarding will add ~140 GB/day.",bad:true},
+ {code:"IGA",p:"Saviynt",m:"Managed identities",used:24600,total:30000,unit:"identities",note:"Headroom holds through FY. Review at 90%."},
+ {code:"PAM",p:"Delinea Secret Server",m:"Named seats",used:1180,total:1500,unit:"seats",note:"Container coverage work will consume the remainder."},
+ {code:"ANS",p:"Ansible",m:"Managed nodes",used:1940,total:2500,unit:"nodes",note:"Sized for the current estate, not the full server population."},
+ {code:"MFA",p:"MFA platform",m:"Enabled users",used:18900,total:25000,unit:"users",note:"Legacy app onboarding is the next draw."},
+ {code:"TIP",p:"Anomali",m:"Analytics add-on",used:0,total:0,unit:"",note:"IOC subscription only. Copilot and Security Analytics not licensed.",none:true},
+ {code:"TIP",p:"Recorded Future",m:"Analyst seats",used:12,total:15,unit:"seats",note:"Duplicate spend against Anomali. Consolidation under review."},
+ {code:"SOA",p:"SOAR",m:"Monthly actions",used:128000,total:200000,unit:"actions",note:"Comfortable. Rises as playbook coverage grows."}
+];
+
+const band = s => s>=80?"ok":s>=60?"watch":"exposed";
+const rband = v => v>=85?"exposed":v>=70?"watch":"ok";
+const label = {ok:"Healthy",watch:"Watch",exposed:"Exposed"};
+const score = p => Math.round(p.cov*0.65 + ((p.avail-98)/2*100)*0.35);
+const fmt = n => n.toLocaleString("en-US");
+let selected = 5;
+
+/* strip */
+const strip = document.getElementById("strip");
+PLATFORMS.forEach((p,i)=>{
+  const s=score(p), b=band(s);
+  const btn=document.createElement("button");
+  btn.className="tile"; btn.setAttribute("role","tab"); btn.setAttribute("aria-selected","false");
+  btn.innerHTML=`<div class="t-code">${p.code}</div><div class="t-name">${p.name}</div>
+    <div class="t-vendor">${p.vendor}</div>
+    <div class="t-score"><b class="s-${b}">${s}</b><span class="t-trend s-${b}">${p.delta>0?"▲":p.delta<0?"▼":"—"} ${Math.abs(p.delta)||""}</span></div>
+    <div class="t-bar"><i class="b-${b}" data-w="${s}"></i></div>`;
+  btn.addEventListener("click",()=>select(i));
+  strip.appendChild(btn);
+});
+
+/* quadrant */
+const plot=document.getElementById("plot");
+PLATFORMS.forEach((p,i)=>{
+  const b=band(score(p));
+  const d=document.createElement("button");
+  d.className=`dot d-${b}`;
+  d.style.left=p.cov+"%";
+  d.style.bottom=Math.max(2,Math.min(98,(p.avail-98)/2*100))+"%";
+  d.style.transitionDelay=(i*55)+"ms";
+  d.textContent=p.code;
+  d.title=`${p.name} — coverage ${p.cov}%, availability ${p.avail}%`;
+  d.setAttribute("aria-label",`${p.name}: coverage ${p.cov} percent, availability ${p.avail} percent`);
+  d.addEventListener("click",()=>select(i));
+  plot.appendChild(d);
+});
+
+/* exposure */
+const expList=document.getElementById("exposure");
+const maxE=Math.max(...EXPOSURE.map(e=>e.n));
+EXPOSURE.forEach(e=>{
+  const li=document.createElement("li");
+  li.innerHTML=`<div class="exp-top"><span class="exp-n">${e.n}</span><span class="exp-t">${e.t}</span></div>
+   <div class="exp-meta"><span class="owner ${e.ext?"ext":""}">${e.owner}</span>
+   <span class="exp-bar"><i data-w="${Math.round(e.n/maxE*100)}"></i></span></div>`;
+  expList.appendChild(li);
+});
+
+/* ---- operations ---- */
+function gauge(v){
+  const b=rband(v);
+  return `<span class="gauge"><span class="track"><i class="b-${b}" data-w="${v}"></i></span><span class="pc s-${b}">${v}%</span></span>`;
+}
+const nodesBody=document.getElementById("nodes");
+let allNodes=[], svcTotal=0, svcBad=0, capAlerts=0;
+PLATFORMS.forEach(p=>{
+  p.nodes.forEach(n=>{
+    allNodes.push({p:p.code,n});
+    if(n[2]>=85||n[3]>=85||n[4]>=85) capAlerts++;
+  });
+  p.services.forEach(s=>{ svcTotal++; if(s[2]!=="up") svcBad++; });
+});
+allNodes.forEach(({p,n})=>{
+  const [name,role,cpu,mem,disk,days,uptime]=n;
+  const worst=Math.max(cpu,mem,disk);
+  const st=worst>=85?"down":worst>=70?"deg":"up";
+  const stTxt=worst>=85?"At limit":worst>=70?"Loaded":"Normal";
+  const tr=document.createElement("tr");
+  tr.dataset.platform=p;
+  tr.innerHTML=`<td><span class="node">${name}</span><br><span class="role">${role}</span></td>
+    <td class="pf">${p}</td><td>${gauge(cpu)}</td><td>${gauge(mem)}</td><td>${gauge(disk)}</td>
+    <td class="right mono ${days&&days<45?"badpc":days&&days<100?"warnpc":""}">${days?days+" d":"—"}</td>
+    <td class="right mono">${uptime} d</td>
+    <td><span class="pill ${st}">${stTxt}</span></td>`;
+  nodesBody.appendChild(tr);
+});
+document.getElementById("o-nodes").textContent=allNodes.length;
+document.getElementById("o-svc").textContent=svcBad;
+document.getElementById("o-svc-total").textContent=svcTotal;
+document.getElementById("o-cap").textContent=capAlerts;
+
+/* uptime strips */
+const upWrap=document.getElementById("uptime");
+PLATFORMS.forEach(p=>{
+  let downD=0, degD=0, bars="";
+  for(let d=0;d<30;d++){
+    const st=p.incidents[d];
+    if(st==="down") downD++; else if(st==="deg") degD++;
+    bars+=`<i class="${st||""}" title="Day ${d+1}${st?" — "+(st==="down"?"outage":"degraded"):""}"></i>`;
+  }
+  const pc=(100-(downD*100+degD*20)/30).toFixed(2);
+  const row=document.createElement("div");
+  row.className="uptime-row"; row.dataset.platform=p.code;
+  row.innerHTML=`<div class="un">${p.name}<span>${p.code}</span></div>
+    <div class="days">${bars}</div>
+    <div class="up-pc s-${pc>=99.5?"ok":pc>=99?"watch":"exposed"}">${pc}%</div>`;
+  upWrap.appendChild(row);
+});
+
+/* licences */
+const licWrap=document.getElementById("licences");
+LICENCES.forEach(l=>{
+  const pc=l.total?Math.round(l.used/l.total*100):0;
+  const b=l.none?"watch":rband(pc);
+  const cell=document.createElement("div");
+  cell.className="lic-cell"+(l.none?" none":""); cell.dataset.platform=l.code;
+  cell.innerHTML=`<h3>${l.p}</h3><div class="lm">${l.m}</div>
+    <div class="lic-num">${l.none?`<b>Not licensed</b>`:`<b class="s-${b}">${pc}%</b><span>${fmt(l.used)} / ${fmt(l.total)} ${l.unit}</span>`}</div>
+    <div class="lic-track"><i class="b-${b}" data-w="${l.none?100:pc}"></i></div>
+    <div class="lic-note ${l.bad?"bad":""}">${l.note}</div>`;
+  licWrap.appendChild(cell);
+});
+
+/* selection + filtering */
+function select(i){
+  selected=i;
+  const p=PLATFORMS[i], s=score(p), b=band(s);
+  strip.querySelectorAll(".tile").forEach((t,j)=>{t.classList.toggle("on",j===i);t.setAttribute("aria-selected",j===i);});
+  plot.querySelectorAll(".dot").forEach((d,j)=>d.classList.toggle("on",j===i));
+
+  document.getElementById("d-name").textContent=p.name;
+  document.getElementById("d-vendor").textContent=p.vendor;
+  const st=document.getElementById("d-status");
+  st.textContent=`${label[b]} · score ${s}`; st.className="chip s-"+b;
+  document.getElementById("metrics").innerHTML=p.metrics.map(m=>
+    `<div class="metric"><div class="m-k">${m.k}</div><div class="m-v">${m.v}<small>${m.u}</small></div><div class="m-t">${m.t}</div></div>`).join("");
+
+  nodesBody.querySelectorAll("tr").forEach(tr=>tr.classList.toggle("dim",tr.dataset.platform!==p.code));
+  upWrap.querySelectorAll(".uptime-row").forEach(r=>r.classList.toggle("dim",r.dataset.platform!==p.code));
+  licWrap.querySelectorAll(".lic-cell").forEach(c=>c.classList.toggle("dim",c.dataset.platform!==p.code));
+  document.getElementById("cap-note").textContent=`Highlighting ${p.name}. Other platforms dimmed, not hidden.`;
+
+  document.getElementById("services").innerHTML=p.services.map(sv=>
+    `<tr><td>${sv[0]}</td><td class="node">${sv[1]}</td>
+     <td><span class="pill ${sv[2]}">${sv[2]==="up"?"Running":sv[2]==="deg"?"Degraded":"Stopped"}</span></td>
+     <td class="right mono">${sv[3]}</td></tr>`).join("");
+}
+
+/* view switch */
+const vbA=document.getElementById("vb-assurance"), vbO=document.getElementById("vb-ops");
+const vA=document.getElementById("v-assurance"), vO=document.getElementById("v-ops");
+function setView(ops){
+  vbO.classList.toggle("on",ops); vbA.classList.toggle("on",!ops);
+  vbO.setAttribute("aria-selected",ops); vbA.setAttribute("aria-selected",!ops);
+  vO.classList.toggle("on",ops); vA.classList.toggle("on",!ops);
+}
+vbA.addEventListener("click",()=>setView(false));
+vbO.addEventListener("click",()=>setView(true));
+
+requestAnimationFrame(()=>{
+  plot.classList.add("ready");
+  document.querySelectorAll("[data-w]").forEach(el=>el.style.width=el.dataset.w+"%");
+});
+select(5);
+</script>
+</body>
+</html>

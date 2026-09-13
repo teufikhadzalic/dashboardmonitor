@@ -1,0 +1,12 @@
+:root {
+  font-family: 'Avenir Next', Avenir, 'Trebuchet MS', sans-serif;
+  color: #19343b;
+  background: #f3f2ed;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body { margin: 0; min-width: 320px; }
+#root { min-height: 100svh; }

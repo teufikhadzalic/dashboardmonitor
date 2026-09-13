@@ -1,0 +1,26 @@
+[
+  {
+    "id": "memory-1788767905131",
+    "name": "testadmin",
+    "email": "testadmin@example.com",
+    "password": "$2b$10$LApitzJasYdM/Daopxs4K.Y4qWgJzO5v/xoHpAYL/a.xFPCGeHCpm",
+    "role": "admin",
+    "status": "approved"
+  },
+  {
+    "id": "memory-1788767925345",
+    "name": "testadmin2",
+    "email": "testadmin2@example.com",
+    "password": "$2b$10$w9SQRWpqpHa/HDCWasZqHuddTZnX.YGuk5jzO8sTz2CKYYjsDDYyW",
+    "role": "user",
+    "status": "approved"
+  },
+  {
+    "id": "memory-1788772904764",
+    "name": "testadmin3",
+    "email": "testadmin3@example.com",
+    "password": "$2b$10$71wyW.Lrms6zHM2zWdoOmO9TFpS7vLv1siUpLwF2oRrgttwXmrbEu",
+    "role": "user",
+    "status": "approved"
+  }
+]
