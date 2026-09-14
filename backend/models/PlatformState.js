@@ -12,18 +12,39 @@ const serviceSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const instanceSchema = new mongoose.Schema(
+  {
+    id: { type: String, required: true },
+    status: { type: String, enum: ["healthy", "warning", "critical"], default: "healthy" },
+    serviceStatus: { type: String, enum: ["online", "offline", "degraded"], default: "online" },
+    cpu: { type: Number, default: 0 },
+    memory: { type: Number, default: 0 },
+    diskUsage: { type: Number, default: 0 },
+    latency: { type: Number, default: 0 },
+    errorRate: { type: Number, default: 0 },
+    uptime: { type: Number, default: 0 },
+    requestRate: { type: Number, default: 0 },
+    metrics: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
+    reasons: { type: [String], default: [] },
+  },
+  { _id: false },
+);
+
 const platformMetricSchema = new mongoose.Schema(
   {
     id: { type: String, required: true },
     shortName: { type: String, required: true },
     name: { type: String, required: true },
     role: { type: String, required: true },
-    nodeStatus: { type: String, enum: ["online", "warning", "offline"], default: "online" },
+    nodeStatus: { type: String, enum: ["online", "warning", "critical", "offline"], default: "online" },
     status: { type: String, enum: ["healthy", "warning", "critical"], default: "healthy" },
     cpu: { type: Number, default: 0 },
     ram: { type: Number, default: 0 },
     latency: { type: Number, default: 0 },
     diskAvailableDays: { type: Number, default: 30 },
+    instances: { type: [instanceSchema], default: [] },
+    aggregate: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
+    reasons: { type: [String], default: [] },
     services: { type: [serviceSchema], default: [] },
     security: {
       type: {

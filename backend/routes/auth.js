@@ -23,6 +23,10 @@ router.post("/register", async (req, res, next) => {
     const email = String(req.body.email || "").trim().toLowerCase();
     const password = String(req.body.password || "");
 
+    if (req.body.role === "admin") {
+      return res.status(403).json({ error: "Administrator accounts must be assigned through the privileged approval workflow" });
+    }
+
     if (!name || !email || !password) {
       return res.status(400).json({ error: "Name, email, and password are required" });
     }
@@ -39,8 +43,9 @@ router.post("/register", async (req, res, next) => {
       return res.status(409).json({ error: "An account with this email already exists" });
     }
 
-    const role = req.body.role === "admin" ? "admin" : "user";
-    const status = role === "admin" ? "approved" : "pending";
+    // Public registration can only create pending standard-user accounts.
+    const role = "user";
+    const status = "pending";
     const passwordHash = await bcrypt.hash(password, 10);
     const user = mongoose.connection.readyState === 1
       ? await User.create({ name, email, password: passwordHash, role, status })

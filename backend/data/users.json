@@ -22,5 +22,13 @@
     "password": "$2b$10$71wyW.Lrms6zHM2zWdoOmO9TFpS7vLv1siUpLwF2oRrgttwXmrbEu",
     "role": "user",
     "status": "approved"
+  },
+  {
+    "id": "memory-1789377623064",
+    "name": "testuser",
+    "email": "testuser@example.com",
+    "password": "$2b$10$F/YszlUoonCO73cwyVTeyeuD4d4gNZkW/2aAAWD5cceFokKJUxTW.",
+    "role": "user",
+    "status": "approved"
   }
 ]

@@ -32,15 +32,9 @@ function formatTime(value) {
   return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
-function scorePlatform(platform) {
-  const headroom = clamp(platform.diskAvailableDays, 0, 60)
-  const weighted = (platform.cpu * 0.4) + (platform.ram * 0.3) + ((60 - headroom) * 1.2)
-  return clamp(Math.round(weighted), 0, 100)
-}
-
 function AuthScreen({ onAuthenticated }) {
   const [mode, setMode] = useState('login')
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'user' })
+  const [form, setForm] = useState({ name: '', email: '', password: '' })
   const [error, setError] = useState('')
   const [canReapply, setCanReapply] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -115,13 +109,6 @@ function AuthScreen({ onAuthenticated }) {
                 Name
                 <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} autoComplete="name" required />
               </label>
-              <label>
-                Account type
-                <select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}>
-                  <option value="user">User - view dashboard after approval</option>
-                  <option value="admin">Admin - prototype access</option>
-                </select>
-              </label>
             </>
           )}
           <label>
@@ -153,7 +140,9 @@ function App() {
   const [approvalRequests, setApprovalRequests] = useState([])
   const [requestsOpen, setRequestsOpen] = useState(false)
   const [activeView, setActiveView] = useState('assurance')
-  const [selectedPlatformId, setSelectedPlatformId] = useState('siem')
+  const [selectedPlatformId, setSelectedPlatformId] = useState(null)
+  const [graphPlatformId, setGraphPlatformId] = useState(null)
+  const [selectedInstanceId, setSelectedInstanceId] = useState(null)
   const [connectionState, setConnectionState] = useState('connecting')
 
   useEffect(() => {
@@ -170,7 +159,7 @@ function App() {
         const payload = await response.json()
         if (payload.dashboard) {
           setDashboard(payload.dashboard)
-          setSelectedPlatformId((current) => current || payload.dashboard.platforms?.[0]?.id || 'siem')
+          setSelectedPlatformId((current) => current || payload.dashboard.platforms?.[0]?.id || null)
         }
       } catch (error) {
         console.error('Failed to fetch initial dashboard state', error)
@@ -242,6 +231,23 @@ function App() {
     () => platforms.find((platform) => platform.id === selectedPlatformId) ?? platforms[0],
     [platforms, selectedPlatformId],
   )
+
+  const selectedInstance = useMemo(
+    () => selectedPlatform?.instances?.find((instance) => instance.id === selectedInstanceId),
+    [selectedPlatform, selectedInstanceId],
+  )
+
+  const graphSeries = graphPlatformId
+    ? (platforms.find((platform) => platform.id === graphPlatformId)?.instances ?? []).map((instance) => ({ ...instance, label: instance.id }))
+    : platforms.map((platform) => ({ ...platform, label: platform.shortName, cpu: platform.aggregate?.cpu ?? platform.cpu, memory: platform.aggregate?.memory ?? platform.ram }))
+
+  const selectPlatform = (platformId) => {
+    setSelectedPlatformId(platformId)
+    setGraphPlatformId(platformId)
+    setSelectedInstanceId(null)
+  }
+
+  const selectInstance = (instanceId) => setSelectedInstanceId(instanceId)
 
   const serviceRows = useMemo(
     () => platforms.flatMap((platform) =>
@@ -409,27 +415,24 @@ function App() {
 
       <div className="strip" role="tablist" aria-label="Platform portfolio">
         {platforms.map((platform, index) => {
-          const score = scorePlatform(platform)
           const active = selectedPlatform?.id === platform.id
           const tone = platform.status === 'critical' ? 'exposed' : platform.status === 'warning' ? 'watch' : 'ok'
+          const healthyInstances = (platform.instances ?? []).filter((instance) => instance.status === 'healthy').length
 
           return (
             <button
               key={platform.id}
               type="button"
               className={`tile ${active ? 'on' : ''}`}
-              onClick={() => setSelectedPlatformId(platform.id)}
+              onClick={() => selectPlatform(platform.id)}
             >
               <div className="t-code">{String(index + 1).padStart(2, '0')}</div>
               <div className="t-name">{platform.shortName}</div>
               <div className="t-vendor">{platform.name}</div>
-              <div className="t-score">
-                <b className={tone === 'ok' ? 's-ok' : tone === 'watch' ? 's-watch' : 's-exposed'}>{score}</b>
-                <div className="t-trend">{platform.nodeStatus}</div>
-              </div>
-              <div className="t-bar">
-                <i className={tone === 'ok' ? 'b-ok' : tone === 'watch' ? 'b-watch' : 'b-exposed'} style={{ width: `${score}%` }} />
-              </div>
+              <div className={`t-status ${tone === 'ok' ? 's-ok' : tone === 'watch' ? 's-watch' : 's-exposed'}`}>{platform.status.toUpperCase()}</div>
+              <div className="t-telemetry">CPU {Math.round(platform.aggregate?.cpu ?? platform.cpu)}% · Mem {Math.round(platform.aggregate?.memory ?? platform.ram)}%</div>
+              <div className="t-telemetry">Error {platform.aggregate?.errorRate ?? platform.errorRate ?? 0}% · {healthyInstances}/{platform.instances?.length ?? 0} healthy</div>
+              <div className="t-reason">{platform.reasons?.[0] ?? 'All monitored telemetry is within thresholds'}</div>
             </button>
           )
         })}
@@ -440,8 +443,9 @@ function App() {
           <div className="two">
             <div className="panel">
               <div className="sec-head">
-                <h2>Exposure terrain</h2>
-                <p>{selectedPlatform?.name ?? 'No platform selected'}</p>
+                <h2>{graphPlatformId ? `${selectedPlatform?.shortName} - Instance telemetry` : 'CS-ASOP platform overview'}</h2>
+                <p>{graphPlatformId ? 'Click an instance for detailed telemetry' : 'Aggregated average across all ten instances per platform'}</p>
+                {graphPlatformId && <button type="button" className="back-btn" onClick={() => { setGraphPlatformId(null); setSelectedInstanceId(null) }}>All platforms</button>}
               </div>
 
               <div className="plot-frame">
@@ -452,20 +456,20 @@ function App() {
                     <span>Critical exposure area</span>
                   </div>
 
-                  {platforms.map((platform) => {
-                    const x = clamp((platform.cpu / 100) * 88 + 6, 10, 94)
-                    const y = clamp(100 - (platform.ram / 100) * 74 - 14, 12, 88)
-                    const tone = platform.status === 'critical' ? 'd-exposed' : platform.status === 'warning' ? 'd-watch' : 'd-ok'
-                    const isOn = selectedPlatform?.id === platform.id
+                  {graphSeries.map((series) => {
+                    const x = clamp(((series.cpu ?? 0) / 100) * 88 + 6, 10, 94)
+                    const y = clamp(100 - ((series.memory ?? series.ram ?? 0) / 100) * 74 - 14, 12, 88)
+                    const tone = series.status === 'critical' ? 'd-exposed' : series.status === 'warning' ? 'd-watch' : 'd-ok'
+                    const isOn = selectedInstanceId === series.id || (!graphPlatformId && selectedPlatform?.id === series.id)
                     return (
                       <button
-                        key={platform.id}
+                        key={series.id}
                         type="button"
                         className={`dot ${tone} ${isOn ? 'on' : ''}`}
                         style={{ left: `${x}%`, top: `${y}%` }}
-                        onClick={() => setSelectedPlatformId(platform.id)}
+                        onClick={() => graphPlatformId ? selectInstance(series.id) : selectPlatform(series.id)}
                       >
-                        {platform.shortName}
+                        {series.label}
                       </button>
                     )
                   })}
@@ -513,32 +517,46 @@ function App() {
 
           <div className="drill">
             <div className="drill-head">
-              <h2>{selectedPlatform?.name ?? 'Platform'} drilldown</h2>
-              <span className={`chip ${statusTone[selectedPlatform?.status] ?? 'ok'}`}>{selectedPlatform?.nodeStatus ?? 'online'}</span>
-              <span className="hint">Telemetry slice</span>
+              <h2>{selectedInstance ? `${selectedInstance.id} telemetry` : `${selectedPlatform?.name ?? 'Platform'} aggregate`}</h2>
+              <span className={`chip ${statusTone[selectedInstance?.status ?? selectedPlatform?.status] ?? 'ok'}`}>{(selectedInstance?.status ?? selectedPlatform?.status ?? 'healthy').toUpperCase()}</span>
+              <span className="hint">{selectedInstance ? 'Instance detail' : 'Platform aggregate'}</span>
             </div>
 
             <div className="metrics">
               <div className="metric">
                 <div className="m-k">CPU usage</div>
-                <div className="m-v">{selectedPlatform?.cpu ?? 0}<small>%</small></div>
+                <div className="m-v">{selectedInstance?.cpu ?? selectedPlatform?.aggregate?.cpu ?? selectedPlatform?.cpu ?? 0}<small>%</small></div>
                 <div className="m-t">Compute pressure</div>
               </div>
               <div className="metric">
                 <div className="m-k">Memory usage</div>
-                <div className="m-v">{selectedPlatform?.ram ?? 0}<small>%</small></div>
+                <div className="m-v">{selectedInstance?.memory ?? selectedPlatform?.aggregate?.memory ?? selectedPlatform?.ram ?? 0}<small>%</small></div>
                 <div className="m-t">Resident demand</div>
               </div>
               <div className="metric">
                 <div className="m-k">Disk headroom</div>
-                <div className="m-v">{selectedPlatform?.diskAvailableDays ?? 0}<small>d</small></div>
-                <div className="m-t">Days remaining</div>
+                <div className="m-v">{selectedInstance ? selectedInstance.diskUsage : selectedPlatform?.aggregate?.diskUsage ?? 0}<small>%</small></div>
+                <div className="m-t">Disk used</div>
               </div>
               <div className="metric">
                 <div className="m-k">Latency</div>
-                <div className="m-v">{selectedPlatform?.latency ?? 0}<small>ms</small></div>
+                <div className="m-v">{selectedInstance?.latency ?? selectedPlatform?.aggregate?.latency ?? selectedPlatform?.latency ?? 0}<small>ms</small></div>
                 <div className="m-t">Request delivery</div>
               </div>
+              <div className="metric">
+                <div className="m-k">Error rate</div>
+                <div className="m-v">{selectedInstance?.errorRate ?? selectedPlatform?.aggregate?.errorRate ?? 0}<small>%</small></div>
+                <div className="m-t">Failed requests</div>
+              </div>
+              <div className="metric">
+                <div className="m-k">Request rate</div>
+                <div className="m-v">{Math.round(selectedInstance?.requestRate ?? selectedPlatform?.aggregate?.requestRate ?? 0)}<small>/s</small></div>
+                <div className="m-t">Current throughput</div>
+              </div>
+            </div>
+            <div className="reason-box">
+              <strong>Why is this {selectedInstance?.status ?? selectedPlatform?.status ?? 'healthy'}?</strong>
+              <ul>{(selectedInstance?.reasons ?? selectedPlatform?.reasons ?? []).map((reason) => <li key={reason}>{reason}</li>)}</ul>
             </div>
           </div>
         </section>

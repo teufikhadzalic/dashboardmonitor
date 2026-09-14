@@ -39,6 +39,9 @@ const defaultBaseline = {
     ...platform,
     nodeStatus: "online",
     status: "healthy",
+    instances: [],
+    aggregate: {},
+    reasons: [],
     security: {
       sessionsBypassingPAM: platform.id === "pam" || platform.id === "mfa" ? 2 : 1,
       outOfHoursAccess: platform.id === "pam" ? 18 : 9,
@@ -69,14 +72,98 @@ function randomBetween(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function deepClone(value) {
-  return JSON.parse(JSON.stringify(value));
+const thresholds = {
+  cpu: { warning: 70, critical: 85 },
+  memory: { warning: 75, critical: 85 },
+  latency: { warning: 100, critical: 200 },
+  errorRate: { warning: 1, critical: 5 },
+  diskUsage: { warning: 80, critical: 92 },
+};
+
+const securityProfiles = {
+  iga: { failedLogins: [8, 58], provisioningFailures: [0, 5], syncHealth: [96, 100], reviewCoverage: [91, 100] },
+  pam: { sessionCount: [80, 320], bypassAttempts: [0, 3], privilegedSessions: [35, 180], breakGlassSessions: [0, 2], outOfHoursAccess: [4, 34], credentialRotation: [92, 100] },
+  mfa: { authAttempts: [800, 4200], mfaFailures: [4, 140], bypassAttempts: [0, 2], pushFatigueEvents: [0, 4] },
+  "ad-entra": { syncFailures: [0, 4], replicationLag: [2, 48], failedLogins: [6, 54], coverage: [94, 100] },
+  sase: { activeSessions: [240, 1200], authenticationFailures: [2, 32], policyDenies: [12, 160], ztnaFailures: [0, 8], throughput: [180, 900] },
+  siem: { ingestionRate: [14000, 48000], processingLatency: [20, 180], logSourcesOnline: [94, 100], ingestionFailures: [0, 4], parserFailures: [0, 3], detectionEvents: [20, 230], retentionHeadroom: [45, 90] },
+  tip: { feedsOnline: [92, 100], indicatorsIngested: [1200, 8800], enrichmentFailures: [0, 4], staleFeeds: [0, 2], blockedThreats: [12, 180] },
+  soar: { activePlaybooks: [4, 38], executionLatency: [20, 160], successfulJobs: [90, 100], failedJobs: [0, 6], pendingJobs: [0, 12], responseActions: [20, 180] },
+  ansible: { jobQueue: [0, 18], executionTime: [30, 240], successfulJobs: [88, 100], failedJobs: [0, 7], patchCompliance: [88, 100], hardeningCompliance: [90, 100], pendingJobs: [0, 15] },
+};
+
+function average(values) {
+  return Math.round((values.reduce((total, value) => total + value, 0) / values.length) * 10) / 10;
 }
 
-function calculatePlatformStatus(cpu, ram, diskAvailableDays) {
-  if (diskAvailableDays <= 28 || cpu >= 82 || ram >= 87) return "warning";
-  if (diskAvailableDays <= 18 || cpu >= 92 || ram >= 95) return "critical";
-  return "healthy";
+function valueFor(range) {
+  return randomBetween(range[0], range[1]);
+}
+
+function instanceStatus(instance) {
+  const reasons = [];
+  if (instance.cpu >= thresholds.cpu.critical) reasons.push("CPU exceeds critical threshold");
+  else if (instance.cpu >= thresholds.cpu.warning) reasons.push("CPU exceeds warning threshold");
+  if (instance.memory >= thresholds.memory.critical) reasons.push("Memory exceeds critical threshold");
+  else if (instance.memory >= thresholds.memory.warning) reasons.push("Memory exceeds warning threshold");
+  if (instance.latency >= thresholds.latency.critical) reasons.push("Latency exceeds critical threshold");
+  else if (instance.latency >= thresholds.latency.warning) reasons.push("Latency exceeds warning threshold");
+  if (instance.errorRate >= thresholds.errorRate.critical) reasons.push("Error rate exceeds critical threshold");
+  else if (instance.errorRate >= thresholds.errorRate.warning) reasons.push("Error rate is elevated");
+  if (instance.diskUsage >= thresholds.diskUsage.critical) reasons.push("Disk headroom is critically low");
+  else if (instance.diskUsage >= thresholds.diskUsage.warning) reasons.push("Disk headroom is low");
+  Object.entries(instance.metrics).forEach(([key, value]) => {
+    if (["bypassAttempts", "pushFatigueEvents", "breakGlassSessions", "outOfHoursAccess", "ingestionFailures", "parserFailures", "failedJobs", "pendingJobs", "failedLogins"].includes(key) && value >= 5) reasons.push(`${key.replace(/[A-Z]/g, (letter) => ` ${letter.toLowerCase()}`)} are elevated`);
+  });
+  if (instance.serviceStatus !== "online") reasons.push("Service process is not online");
+  const critical = reasons.some((reason) => reason.includes("critical") || reason.includes("not online"));
+  return { status: critical ? "critical" : reasons.length ? "warning" : "healthy", reasons: reasons.length ? reasons : ["All monitored telemetry is within configured thresholds"] };
+}
+
+function buildInstance(platform, index, previous) {
+  const id = `${platform.shortName.replace(/[^A-Z0-9]/gi, "").toUpperCase()}-${String(index + 1).padStart(2, "0")}`;
+  const previousMetrics = previous ?? {};
+  const instance = {
+    id,
+    cpu: clamp((previous?.cpu ?? randomBetween(28, 68)) + randomBetween(-7, 8), 12, 98),
+    memory: clamp((previous?.memory ?? randomBetween(32, 70)) + randomBetween(-6, 7), 18, 98),
+    diskUsage: clamp((previous?.diskUsage ?? randomBetween(34, 76)) + randomBetween(-3, 4), 20, 98),
+    latency: clamp((previous?.latency ?? randomBetween(24, 92)) + randomBetween(-12, 16), 8, 280),
+    errorRate: clamp(Math.round(((previous?.errorRate ?? randomBetween(0, 9) / 10) + randomBetween(-3, 4) / 10) * 10) / 10, 0, 9),
+    uptime: (previous?.uptime ?? randomBetween(8, 46)) + 0.05,
+    requestRate: clamp((previous?.requestRate ?? randomBetween(320, 2200)) + randomBetween(-180, 220), 40, 5000),
+    serviceStatus: previous?.serviceStatus === "offline" && Math.random() > 0.35 ? "online" : "online",
+    metrics: {},
+  };
+  const profile = securityProfiles[platform.id] ?? {};
+  Object.entries(profile).forEach(([key, range]) => {
+    instance.metrics[key] = valueFor(previousMetrics[key] ? [Math.max(range[0], previousMetrics[key] - 8), Math.min(range[1], previousMetrics[key] + 8)] : range);
+  });
+  if (platform.id === "iga" && index === 2) Object.assign(instance, { cpu: 92, memory: 86, latency: 62, errorRate: 2.1, metrics: { ...instance.metrics, failedLogins: 17 } });
+  if (platform.id === "pam" && index === 3) Object.assign(instance.metrics, { bypassAttempts: 12, breakGlassSessions: 4, outOfHoursAccess: 31 });
+  if (platform.id === "siem" && index === 4) Object.assign(instance.metrics, { logSourcesOnline: 82, ingestionFailures: 8, parserFailures: 7, retentionHeadroom: 18 });
+  const health = instanceStatus(instance);
+  return { ...instance, status: health.status, reasons: health.reasons };
+}
+
+function aggregatePlatform(platform, instances) {
+  const aggregate = {
+    cpu: average(instances.map((instance) => instance.cpu)),
+    memory: average(instances.map((instance) => instance.memory)),
+    latency: average(instances.map((instance) => instance.latency)),
+    errorRate: average(instances.map((instance) => instance.errorRate)),
+    diskUsage: average(instances.map((instance) => instance.diskUsage)),
+    requestRate: Math.round(instances.reduce((total, instance) => total + instance.requestRate, 0)),
+  };
+  Object.keys(instances[0]?.metrics ?? {}).forEach((key) => { aggregate[key] = average(instances.map((instance) => Number(instance.metrics[key]) || 0)); });
+  const critical = instances.filter((instance) => instance.status === "critical").length;
+  const warning = instances.filter((instance) => instance.status === "warning").length;
+  const reasons = [...new Set(instances.flatMap((instance) => instance.reasons).filter((reason) => !reason.startsWith("All monitored")))].slice(0, 3);
+  return { aggregate, status: critical ? "critical" : warning ? "warning" : "healthy", nodeStatus: critical ? "critical" : warning ? "warning" : "online", reasons: reasons.length ? reasons : ["All monitored instances are within configured thresholds"] };
+}
+
+function deepClone(value) {
+  return JSON.parse(JSON.stringify(value));
 }
 
 function buildSummary(platforms, security) {
@@ -94,13 +181,13 @@ function buildSummary(platforms, security) {
   return { overallHealth, onlineNodes, warningNodes, criticalNodes };
 }
 
-async function loadBaselineState() {
+async function loadBaselineState() {                       
   if (mongoose.connection.readyState !== 1) {
     return deepClone(defaultBaseline);
   }
 
   const existing = await PlatformState.findOne({ name: "cs-asop-platform-baseline" }).lean();
-  if (existing?.platforms?.length === 9) {
+  if (existing?.platforms?.length === 9 && existing.platforms.every((platform) => platform.instances?.length === 10)) {
     return existing;
   }
 
@@ -113,78 +200,26 @@ function generateDashboardSnapshot(previousSnapshot = defaultBaseline) {
   state.tick = tick;
 
   const next = deepClone(previousSnapshot);
-  const anomalyCycle = tick % 5 === 0;
-  const siemDegenerate = tick % 3 === 0 || Math.random() < 0.15;
-
   next.platforms = next.platforms.map((platform) => {
-    const cpu = clamp(platform.cpu + randomBetween(-12, 14), 18, 96);
-    const ram = clamp(platform.ram + randomBetween(-10, 14), 18, 96);
-    const latency = clamp(platform.latency + randomBetween(-18, 26), 12, 200);
-    let diskAvailableDays = clamp(platform.diskAvailableDays + randomBetween(-7, 10), 18, 90);
-    const status = calculatePlatformStatus(cpu, ram, diskAvailableDays);
-
-    let nodeStatus = status === "healthy" ? "online" : status === "warning" ? "warning" : "critical";
-
-    if (platform.id === "ansible") {
-      diskAvailableDays = anomalyCycle ? 28 : clamp(diskAvailableDays, 28, 90);
-      nodeStatus = diskAvailableDays <= 30 ? "warning" : nodeStatus;
-    }
-
-    const services = (platform.services ?? []).map((service) => {
-      const serviceCpu = clamp(service.cpu + randomBetween(-20, 20), 10, 90);
-      const memory = clamp(service.memory + randomBetween(-12, 12), 10, 75);
-      let serviceStatus = service.status;
-
-      if (platform.id === "siem" && service.id === "splunkd-indexing" && (siemDegenerate || anomalyCycle)) {
-        serviceStatus = "deg";
-      }
-
-      if (platform.id === "pam" && service.id === "just-in-time" && anomalyCycle) {
-        serviceStatus = "down";
-      }
-
-      return { ...service, cpu: serviceCpu, memory, status: serviceStatus };
-    });
-
-    const security = {
-      sessionsBypassingPAM: platform.id === "pam" || platform.id === "mfa" ? clamp((platform.security?.sessionsBypassingPAM ?? 2) + randomBetween(-1, 2), 1, 7) : 1,
-      outOfHoursAccess: platform.id === "pam" ? clamp((platform.security?.outOfHoursAccess ?? 18) + randomBetween(-5, 7), 8, 38) : 9,
-    };
-
-    if (platform.id === "pam" && anomalyCycle) {
-      security.sessionsBypassingPAM = 6;
-      security.outOfHoursAccess = 31;
-    }
-
-    return {
-      ...platform,
-      cpu,
-      ram,
-      latency,
-      diskAvailableDays,
-      nodeStatus,
-      status,
-      services,
-      security,
-    };
+    const instances = Array.from({ length: 10 }, (_, index) => buildInstance(platform, index, platform.instances?.[index]));
+    const result = aggregatePlatform(platform, instances);
+    const services = (platform.services ?? []).map((service) => ({
+      ...service,
+      cpu: clamp(Math.round(result.aggregate.cpu + randomBetween(-15, 12)), 5, 98),
+      memory: clamp(Math.round(result.aggregate.memory / 2 + randomBetween(-8, 8)), 5, 90),
+      status: result.status === "critical" && service.id === "splunkd-indexing" ? "deg" : "up",
+    }));
+    return { ...platform, ...result.aggregate, ram: result.aggregate.memory, diskAvailableDays: Math.round(100 - result.aggregate.diskUsage), instances, ...result, services };
   });
 
   const aggregateSecurity = {
-    sessionsBypassingPAM: anomalyCycle ? 6 : clamp(Math.max(...next.platforms.map((platform) => platform.security.sessionsBypassingPAM)) + randomBetween(-2, 2), 1, 7),
-    outOfHoursAccess: anomalyCycle ? 31 : clamp(Math.max(...next.platforms.map((platform) => platform.security.outOfHoursAccess)) + randomBetween(-7, 9), 10, 42),
-    failedLogins: clamp((next.security?.failedLogins ?? 12) + randomBetween(-5, 9), 8, 45),
-    blockedThreats: clamp((next.security?.blockedThreats ?? 230) + randomBetween(-20, 35), 160, 320),
+    sessionsBypassingPAM: Math.round(next.platforms.find((platform) => platform.id === "pam")?.aggregate.bypassAttempts ?? 0),
+    outOfHoursAccess: Math.round(next.platforms.find((platform) => platform.id === "pam")?.aggregate.outOfHoursAccess ?? 0),
+    failedLogins: Math.round(next.platforms.find((platform) => platform.id === "iga")?.aggregate.failedLogins ?? 0),
+    blockedThreats: Math.round(next.platforms.find((platform) => platform.id === "tip")?.aggregate.blockedThreats ?? 0),
   };
 
   next.security = aggregateSecurity;
-  next.platforms = next.platforms.map((platform) => ({
-    ...platform,
-    security: {
-      sessionsBypassingPAM: platform.id === "pam" || platform.id === "mfa" ? aggregateSecurity.sessionsBypassingPAM : 1,
-      outOfHoursAccess: platform.id === "pam" ? aggregateSecurity.outOfHoursAccess : 9,
-    },
-  }));
-
   next.summary = buildSummary(next.platforms, aggregateSecurity);
   next.updatedAt = new Date().toISOString();
   return next;
