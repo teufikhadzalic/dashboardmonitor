@@ -144,6 +144,9 @@ function App() {
   const [graphPlatformId, setGraphPlatformId] = useState(null)
   const [selectedInstanceId, setSelectedInstanceId] = useState(null)
   const [connectionState, setConnectionState] = useState('connecting')
+  const [operationsQuery, setOperationsQuery] = useState('')
+  const [operationsFilters, setOperationsFilters] = useState({ platform: '', status: '', health: '', datacenter: '', environment: '', os: '' })
+  const [selectedOperationKey, setSelectedOperationKey] = useState(null)
 
   useEffect(() => {
     if (!auth?.token) return undefined
@@ -251,10 +254,57 @@ function App() {
 
   const serviceRows = useMemo(
     () => platforms.flatMap((platform) =>
-      (platform.services ?? []).map((service) => ({ ...service, platformId: platform.id, platformName: platform.name, role: platform.role }))
+      (platform.instances ?? []).flatMap((instance, instanceIndex) => {
+        const service = platform.services?.[instanceIndex % (platform.services?.length || 1)]
+        if (!service) return []
+        return [{
+          ...service,
+          ...instance,
+          serviceName: service.name,
+          serviceId: service.id,
+          platformId: platform.id,
+          platformName: platform.name,
+          role: platform.role,
+          serviceStatus: instance.serviceStatus ?? (service.status === 'down' ? 'offline' : service.status === 'deg' ? 'degraded' : 'online'),
+          serviceState: instance.serviceStatus === 'offline' ? 'down' : instance.serviceStatus === 'degraded' || instance.status === 'warning' ? 'deg' : 'up',
+          health: instance.status ?? platform.status,
+          operationKey: `${platform.id}-${instance.id}-${service.id}`,
+        }]
+      })
     ),
     [platforms],
   )
+
+  const operationOptions = useMemo(() => ({
+    platforms: [...new Set(serviceRows.map((row) => row.platform))].filter(Boolean),
+    datacenters: [...new Set(serviceRows.map((row) => row.datacenter))].filter(Boolean),
+    environments: [...new Set(serviceRows.map((row) => row.environment))].filter(Boolean),
+    os: [...new Set(serviceRows.map((row) => row.os))].filter(Boolean),
+  }), [serviceRows])
+
+  const filteredServiceRows = useMemo(() => {
+    const normalize = (value) => String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase()
+    const query = normalize(operationsQuery)
+    return serviceRows.filter((row) => {
+      const searchable = normalize([row.serviceName, row.serviceId, row.platform, row.platformName, row.id, row.hostname, row.ipAddress, row.os, row.osVersion, row.datacenter, row.region, row.environment, row.serviceStatus, row.serviceState, row.health].filter(Boolean).join(' '))
+      const matchesQuery = !query || searchable.includes(query)
+      const matches = (key, value) => !value || normalize(row[key]) === normalize(value)
+      return matchesQuery
+        && matches('platform', operationsFilters.platform)
+        && matches('serviceState', operationsFilters.status)
+        && matches('health', operationsFilters.health)
+        && matches('datacenter', operationsFilters.datacenter)
+        && matches('environment', operationsFilters.environment)
+        && matches('os', operationsFilters.os)
+    })
+  }, [operationsFilters, operationsQuery, serviceRows])
+
+  const clearOperationFilters = () => {
+    setOperationsQuery('')
+    setOperationsFilters({ platform: '', status: '', health: '', datacenter: '', environment: '', os: '' })
+  }
+
+  const selectedOperation = filteredServiceRows.find((row) => row.operationKey === selectedOperationKey)
 
   const alerts = useMemo(() => {
     const list = []
@@ -385,6 +435,7 @@ function App() {
         ))}
       </div>
 
+      {activeView === 'assurance' && <>
       <div className="figures">
         <div className="fig">
           <div className="k">Platform health</div>
@@ -437,6 +488,7 @@ function App() {
           )
         })}
       </div>
+      </>}
 
       {activeView === 'assurance' && (
         <section className="view on" id="v-assurance" role="tabpanel">
@@ -481,7 +533,7 @@ function App() {
                   <span>25</span>
                   <span>0</span>
                 </div>
-                <div className="ax-title-y">Threat load</div>
+                <div className="ax-title-y">Memory utilization</div>
                 <div className="ax-x">
                   <span>0</span>
                   <span>25</span>
@@ -489,7 +541,7 @@ function App() {
                   <span>75</span>
                   <span>100</span>
                 </div>
-                <div className="ax-title">Platform load</div>
+                <div className="ax-title">CPU utilization</div>
               </div>
             </div>
 
@@ -554,10 +606,18 @@ function App() {
                 <div className="m-t">Current throughput</div>
               </div>
             </div>
-            <div className="reason-box">
-              <strong>Why is this {selectedInstance?.status ?? selectedPlatform?.status ?? 'healthy'}?</strong>
-              <ul>{(selectedInstance?.reasons ?? selectedPlatform?.reasons ?? []).map((reason) => <li key={reason}>{reason}</li>)}</ul>
-            </div>
+            {(selectedInstance?.status ?? selectedPlatform?.status ?? 'healthy') !== 'healthy' && <div className={`reason-box ${selectedInstance?.status ?? selectedPlatform?.status ?? 'healthy'}`}>
+              <strong>Health reasons</strong>
+              <div className="reason-alerts">
+                {(selectedInstance?.reasons ?? selectedPlatform?.reasons ?? []).filter((reason) => !reason.startsWith('All monitored')).map((reason) => {
+                  const severity = reason.includes('critical') || reason.includes('offline') ? 'critical' : 'warning'
+                  const reasonParts = reason.match(/^([^ ]+\-\d+)\s+(.+)$/)
+                  const affectedInstance = reasonParts?.[1]
+                  const message = reasonParts?.[2] ?? reason
+                  return <div className={`reason-alert ${severity}`} key={reason}><span className="reason-alert-label">{severity.toUpperCase()}</span>{affectedInstance && <strong className="reason-alert-instance">{affectedInstance}</strong>}<span className="reason-alert-message">{message}</span></div>
+                })}
+              </div>
+            </div>}
           </div>
         </section>
       )}
@@ -567,93 +627,113 @@ function App() {
           <div className="panel">
             <div className="sec-head">
               <h2>Service operations</h2>
-              <p>Process health across all nine CS-ASOP platforms</p>
+              <p>Searchable service and infrastructure inventory</p>
             </div>
 
-            <table>
+            <div className="ops-tools">
+              <input
+                className="ops-search"
+                value={operationsQuery}
+                onChange={(event) => setOperationsQuery(event.target.value)}
+                placeholder="Search service, instance, hostname, IP, OS..."
+                aria-label="Search services and infrastructure"
+              />
+              {[
+                ['platform', 'Platform', operationOptions.platforms],
+                ['status', 'Status', ['up', 'deg', 'down']],
+                ['health', 'Health', ['healthy', 'warning', 'critical']],
+                ['datacenter', 'Data center', operationOptions.datacenters],
+                ['environment', 'Environment', operationOptions.environments],
+                ['os', 'OS', operationOptions.os],
+              ].map(([key, label, options]) => (
+                <select
+                  key={key}
+                  className="ops-filter"
+                  value={operationsFilters[key]}
+                  onChange={(event) => setOperationsFilters((current) => ({ ...current, [key]: event.target.value }))}
+                  aria-label={`${label} filter`}
+                >
+                  <option value="">All {label}s</option>
+                  {options.map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+              ))}
+              <button type="button" className="ops-clear" onClick={clearOperationFilters}>Clear filters</button>
+            </div>
+
+            <div className="ops-result-count">Showing {filteredServiceRows.length} of {serviceRows.length} instances</div>
+
+            {filteredServiceRows.length > 0 && <table>
               <thead>
                 <tr>
                   <th>Platform</th>
                   <th>Service</th>
-                  <th>Role</th>
+                  <th>Instance / Host</th>
+                  <th>IP</th>
                   <th>Status</th>
+                  <th>Health</th>
                   <th className="num">CPU</th>
                   <th className="num">Mem</th>
+                  <th className="num">Latency</th>
                   <th className="num">Uptime</th>
                 </tr>
               </thead>
               <tbody>
-                {serviceRows.map((service) => (
-                  <tr key={`${service.platformId}-${service.id}`} className={service.status === 'deg' ? 'dim' : ''}>
+                {filteredServiceRows.map((service) => (
+                  <tr
+                    key={service.operationKey}
+                    className={`${service.serviceState === 'deg' ? 'dim' : ''} ops-row`}
+                    onClick={() => setSelectedOperationKey(service.operationKey)}
+                  >
                     <td>
                       <div className="node">{service.platformName}</div>
                       <div className="role">{service.platformId.toUpperCase()}</div>
                     </td>
                     <td>
-                      <div className="node">{service.name}</div>
-                      <div className="pf">{service.id}</div>
+                      <div className="node">{service.serviceName}</div>
+                      <div className="pf">{service.serviceId}</div>
                     </td>
-                    <td><span className="mono">{service.role}</span></td>
                     <td>
-                      <span className={`pill ${service.status === 'up' ? 'up' : service.status === 'deg' ? 'deg' : 'down'}`}>
-                        {service.status}
+                      <div className="node">{service.id}</div>
+                      <div className="pf">{service.hostname}</div>
+                    </td>
+                    <td><span className="mono">{service.ipAddress}</span></td>
+                    <td>
+                      <span className={`pill ${service.serviceState === 'up' ? 'up' : service.serviceState === 'deg' ? 'deg' : 'down'}`}>
+                        {service.serviceState === 'up' ? 'UP' : service.serviceState === 'deg' ? 'DEGRADED' : 'DOWN'}
                       </span>
                     </td>
+                    <td><span className={`pill ${service.health === 'healthy' ? 'up' : service.health === 'warning' ? 'deg' : 'down'}`}>{service.health}</span></td>
                     <td className="right">
                       <div className="gauge">
-                        <div className="track"><i style={{ width: `${service.cpu}%`, background: service.cpu >= 70 ? '#d9655c' : service.cpu >= 45 ? '#e4a450' : '#1bb78d' }} /></div>
+                        <div className="track"><i style={{ width: `${service.cpu}%`, background: service.cpu > 80 ? '#d9655c' : service.cpu >= 70 ? '#e4a450' : '#1bb78d' }} /></div>
                         <span className="pc">{service.cpu}%</span>
                       </div>
                     </td>
                     <td className="right"><span className="mono">{service.memory}%</span></td>
+                    <td className="right"><span className="mono">{service.latency}ms</span></td>
                     <td className="right"><span className="mono">{service.uptime}h</span></td>
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table>}
+            {!filteredServiceRows.length && <div className="ops-empty"><strong>No matching services or instances</strong><span>Try another hostname, IP address, service, platform, or status.</span></div>}
           </div>
 
-          <div className="lic">
-            <div className="lic-cell">
-              <h3>Access control</h3>
-              <div className="lm">Sessions bypassing PAM</div>
-              <div className="lic-num"><b>{security.sessionsBypassingPAM}</b><span>live</span></div>
-              <div className="lic-track"><i style={{ width: `${Math.min(security.sessionsBypassingPAM * 18, 100)}%`, background: '#d9655c' }} /></div>
-              <div className="lic-note bad">Threshold alert triggered</div>
+          {selectedOperation && (
+            <div className="ops-detail panel">
+              <div className="drill-head">
+                <h2>{selectedOperation.id} / {selectedOperation.serviceName}</h2>
+                <span className={`chip ${statusTone[selectedOperation.health]}`}>{selectedOperation.health.toUpperCase()}</span>
+                <button type="button" className="back-btn" onClick={() => setSelectedOperationKey(null)}>Close detail</button>
+              </div>
+              <div className="ops-detail-grid">
+                <div><h3>Infrastructure</h3><p><b>OS</b> {selectedOperation.os} {selectedOperation.osVersion}</p><p><b>Architecture</b> {selectedOperation.architecture}</p><p><b>Datacenter</b> {selectedOperation.datacenter} / {selectedOperation.region} / Zone {selectedOperation.zone}</p><p><b>Environment</b> {selectedOperation.environment}</p><p><b>Hostname</b> {selectedOperation.hostname}</p><p><b>IP address</b> {selectedOperation.ipAddress}</p></div>
+                <div><h3>Performance</h3><p><b>CPU</b> {selectedOperation.cpu}%</p><p><b>Memory</b> {selectedOperation.memory}%</p><p><b>Disk used</b> {selectedOperation.diskUsage}%</p><p><b>Latency</b> {selectedOperation.latency}ms</p><p><b>Request rate</b> {selectedOperation.requestRate}/s</p><p><b>Error rate</b> {selectedOperation.errorRate}%</p><p><b>Network</b> {selectedOperation.networkThroughput} Mbps / {selectedOperation.activeConnections} connections</p></div>
+                <div><h3>Availability</h3><p><b>Service</b> {selectedOperation.serviceStatus}</p><p><b>Instance health</b> {selectedOperation.health}</p><p><b>Uptime</b> {selectedOperation.uptime}h</p><p><b>Last restart</b> {formatTime(selectedOperation.lastRestart)}</p><p><b>Reason</b> {selectedOperation.reasons?.[0] ?? 'All monitored telemetry is within thresholds'}</p></div>
+              </div>
             </div>
-            <div className="lic-cell">
-              <h3>Identity drift</h3>
-              <div className="lm">Out-of-hours access</div>
-              <div className="lic-num"><b>{security.outOfHoursAccess}</b><span>events</span></div>
-              <div className="lic-track"><i style={{ width: `${Math.min(security.outOfHoursAccess * 3, 100)}%`, background: '#e4a450' }} /></div>
-              <div className="lic-note">Elevated but bounded</div>
-            </div>
-            <div className="lic-cell none">
-              <h3>Blocked threats</h3>
-              <div className="lm">Security stack</div>
-              <div className="lic-num"><b>{security.blockedThreats}</b><span>blocked</span></div>
-              <div className="lic-track"><i style={{ width: `${Math.min((security.blockedThreats / 320) * 100, 100)}%`, background: '#1bb78d' }} /></div>
-              <div className="lic-note">Response load remains within target</div>
-            </div>
-          </div>
+          )}
 
-          <div className="access">
-            <div className="acc">
-              <div className="k">PAM bypass</div>
-              <div className="v">{security.sessionsBypassingPAM}</div>
-              <div className="n">sessions bypassing policy</div>
-            </div>
-            <div className="acc">
-              <div className="k">Failed logins</div>
-              <div className="v">{security.failedLogins}</div>
-              <div className="n">password attack indicators</div>
-            </div>
-            <div className="acc">
-              <div className="k">Out of hours</div>
-              <div className="v">{security.outOfHoursAccess}</div>
-              <div className="n">privileged access anomalies</div>
-            </div>
-          </div>
         </section>
       )}
 

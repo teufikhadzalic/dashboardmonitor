@@ -600,11 +600,22 @@ button { font: inherit; }
   text-transform: uppercase;
 }
 
-.reason-box ul {
-  color: var(--ink-2);
-  margin: 8px 0 0;
-  padding-left: 18px;
+.reason-alerts { display: grid; gap: 9px; margin-top: 10px; }
+.reason-alert {
+  display: grid;
+  grid-template-columns: auto minmax(70px, 0.25fr) 1fr;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 14px;
+  border: 1px solid;
+  border-left-width: 5px;
 }
+.reason-alert.critical { background: var(--exposed-bg); border-color: #d99b93; color: #7f2d28; }
+.reason-alert.warning { background: var(--watch-bg); border-color: #dfbd72; color: #79500e; }
+.reason-alert.healthy { background: var(--ok-bg); border-color: #a8d1c5; color: #176c58; }
+.reason-alert-label { font: 700 10px var(--mono); letter-spacing: 0.1em; }
+.reason-alert-instance { font: 700 12px var(--mono); }
+.reason-alert-message { font-size: 13px; }
 
 .metric {
   padding: 15px 18px 15px 0;
@@ -754,6 +765,35 @@ table {
   border-collapse: collapse;
   font-size: 12.5px;
 }
+
+.ops-tools {
+  display: grid;
+  grid-template-columns: minmax(240px, 2fr) repeat(6, minmax(110px, 1fr));
+  gap: 7px;
+  margin: 12px 0 18px;
+}
+.ops-search, .ops-filter {
+  min-width: 0;
+  border: 1px solid var(--rule);
+  background: #fff;
+  color: var(--ink);
+  padding: 9px 10px;
+  font: 12px var(--body);
+}
+.ops-search:focus, .ops-filter:focus { outline: 2px solid var(--signal); outline-offset: 1px; }
+.ops-clear { border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; padding: 8px 10px; font: 11px var(--mono); text-transform: uppercase; }
+.ops-clear:hover { background: var(--signal); border-color: var(--signal); }
+.ops-result-count { margin: -6px 0 12px; color: var(--ink-2); font: 11px var(--mono); }
+.ops-row { cursor: pointer; }
+.ops-row:hover { background: #eef5f1; }
+.ops-empty { display: grid; gap: 4px; color: var(--ink-2); padding: 28px 16px; border: 1px dashed var(--rule); text-align: center; }
+.ops-empty strong { color: var(--ink); font-size: 14px; }
+.ops-empty span { font-size: 12px; }
+.ops-detail { margin-top: 0; }
+.ops-detail-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; padding-top: 16px; }
+.ops-detail-grid h3 { margin: 0 0 10px; font: 700 13px var(--display); text-transform: uppercase; letter-spacing: 0.06em; }
+.ops-detail-grid p { margin: 7px 0; color: var(--ink-2); font-size: 12px; }
+.ops-detail-grid b { display: inline-block; min-width: 112px; color: var(--ink); font-family: var(--mono); font-size: 10px; text-transform: uppercase; }
 
 thead th {
   font-family: var(--mono);
