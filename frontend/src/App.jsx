@@ -27,6 +27,15 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max)
 }
 
+function reasonSeverity(reason) {
+  return reason.includes('critical') || reason.includes('offline') ? 'critical' : 'warning'
+}
+
+function reasonMessage(reason, instanceId) {
+  const prefix = `${instanceId} `
+  return reason.startsWith(prefix) ? reason.slice(prefix.length) : reason
+}
+
 function formatTime(value) {
   if (!value) return '--:--:--'
   return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -242,7 +251,13 @@ function App() {
 
   const graphSeries = graphPlatformId
     ? (platforms.find((platform) => platform.id === graphPlatformId)?.instances ?? []).map((instance) => ({ ...instance, label: instance.id }))
-    : platforms.map((platform) => ({ ...platform, label: platform.shortName, cpu: platform.aggregate?.cpu ?? platform.cpu, memory: platform.aggregate?.memory ?? platform.ram }))
+    : platforms.map((platform) => ({
+      ...platform,
+      platformId: platform.id,
+      cpu: platform.aggregate?.cpu ?? platform.cpu,
+      memory: platform.aggregate?.memory ?? platform.ram,
+      label: platform.shortName,
+    }))
 
   const selectPlatform = (platformId) => {
     setSelectedPlatformId(platformId)
@@ -496,30 +511,40 @@ function App() {
             <div className="panel">
               <div className="sec-head">
                 <h2>{graphPlatformId ? `${selectedPlatform?.shortName} - Instance telemetry` : 'CS-ASOP platform overview'}</h2>
-                <p>{graphPlatformId ? 'Click an instance for detailed telemetry' : 'Aggregated average across all ten instances per platform'}</p>
+                <p>{graphPlatformId ? 'Click an instance for detailed telemetry' : 'Mean CPU and memory across each platform; bands show thresholds'}</p>
+                <label className="graph-platform-picker">
+                  <span>View instances</span>
+                  <select value={graphPlatformId ?? ''} onChange={(event) => event.target.value ? selectPlatform(event.target.value) : setGraphPlatformId(null)} aria-label="View platform instances">
+                    <option value="">Choose a platform</option>
+                    {platforms.map((platform) => <option key={platform.id} value={platform.id}>{platform.shortName}</option>)}
+                  </select>
+                </label>
                 {graphPlatformId && <button type="button" className="back-btn" onClick={() => { setGraphPlatformId(null); setSelectedInstanceId(null) }}>All platforms</button>}
               </div>
 
               <div className="plot-frame">
                 <div className="plot ready">
-                  <div className="zone" />
+                  <div className="zone zone-warning-cpu" />
+                  <div className="zone zone-critical-cpu" />
+                  <div className="zone zone-warning-memory" />
+                  <div className="zone zone-critical-memory" />
                   <div className="zone-label">
-                    Risk zone
-                    <span>Critical exposure area</span>
+                    Threshold bands
+                    <span>Yellow: warning · Red: critical</span>
                   </div>
 
                   {graphSeries.map((series) => {
-                    const x = clamp(((series.cpu ?? 0) / 100) * 88 + 6, 10, 94)
-                    const y = clamp(100 - ((series.memory ?? series.ram ?? 0) / 100) * 74 - 14, 12, 88)
+                    const x = clamp(Number(series.cpu ?? 0), 0, 100)
+                    const y = clamp(100 - Number(series.memory ?? series.ram ?? 0), 0, 100)
                     const tone = series.status === 'critical' ? 'd-exposed' : series.status === 'warning' ? 'd-watch' : 'd-ok'
-                    const isOn = selectedInstanceId === series.id || (!graphPlatformId && selectedPlatform?.id === series.id)
+                    const isOn = selectedInstanceId === series.id
                     return (
                       <button
                         key={series.id}
                         type="button"
                         className={`dot ${tone} ${isOn ? 'on' : ''}`}
                         style={{ left: `${x}%`, top: `${y}%` }}
-                        onClick={() => graphPlatformId ? selectInstance(series.id) : selectPlatform(series.id)}
+                        onClick={() => graphPlatformId ? selectInstance(series.id) : selectPlatform(series.platformId)}
                       >
                         {series.label}
                       </button>
@@ -542,6 +567,7 @@ function App() {
                   <span>100</span>
                 </div>
                 <div className="ax-title">CPU utilization</div>
+                <div className="plot-legend"><span className="legend-dot" />Point colour = full instance health <span className="legend-band warning" />CPU/memory warning <span className="legend-band critical" />CPU/memory critical</div>
               </div>
             </div>
 
@@ -681,7 +707,7 @@ function App() {
                 {filteredServiceRows.map((service) => (
                   <tr
                     key={service.operationKey}
-                    className={`${service.serviceState === 'deg' ? 'dim' : ''} ops-row`}
+                    className="ops-row"
                     onClick={() => setSelectedOperationKey(service.operationKey)}
                   >
                     <td>
@@ -729,7 +755,15 @@ function App() {
               <div className="ops-detail-grid">
                 <div><h3>Infrastructure</h3><p><b>OS</b> {selectedOperation.os} {selectedOperation.osVersion}</p><p><b>Architecture</b> {selectedOperation.architecture}</p><p><b>Datacenter</b> {selectedOperation.datacenter} / {selectedOperation.region} / Zone {selectedOperation.zone}</p><p><b>Environment</b> {selectedOperation.environment}</p><p><b>Hostname</b> {selectedOperation.hostname}</p><p><b>IP address</b> {selectedOperation.ipAddress}</p></div>
                 <div><h3>Performance</h3><p><b>CPU</b> {selectedOperation.cpu}%</p><p><b>Memory</b> {selectedOperation.memory}%</p><p><b>Disk used</b> {selectedOperation.diskUsage}%</p><p><b>Latency</b> {selectedOperation.latency}ms</p><p><b>Request rate</b> {selectedOperation.requestRate}/s</p><p><b>Error rate</b> {selectedOperation.errorRate}%</p><p><b>Network</b> {selectedOperation.networkThroughput} Mbps / {selectedOperation.activeConnections} connections</p></div>
-                <div><h3>Availability</h3><p><b>Service</b> {selectedOperation.serviceStatus}</p><p><b>Instance health</b> {selectedOperation.health}</p><p><b>Uptime</b> {selectedOperation.uptime}h</p><p><b>Last restart</b> {formatTime(selectedOperation.lastRestart)}</p><p><b>Reason</b> {selectedOperation.reasons?.[0] ?? 'All monitored telemetry is within thresholds'}</p></div>
+                <div><h3>Availability</h3><p><b>Service</b> {selectedOperation.serviceStatus}</p><p><b>Instance health</b> {selectedOperation.health}</p><p><b>Uptime</b> {selectedOperation.uptime}h</p><p><b>Last restart</b> {formatTime(selectedOperation.lastRestart)}</p></div>
+              </div>
+              <div className="ops-reasons">
+                <h3>Health reasons</h3>
+                {(selectedOperation.reasons ?? []).filter((reason) => !reason.startsWith('All monitored')).map((reason) => {
+                  const severity = reasonSeverity(reason)
+                  return <div className={`reason-alert ${severity}`} key={reason}><span className="reason-alert-label">{severity.toUpperCase()}</span><strong className="reason-alert-instance">{selectedOperation.id}</strong><span className="reason-alert-message">{reasonMessage(reason, selectedOperation.id)}</span></div>
+                })}
+                {(!selectedOperation.reasons || selectedOperation.reasons.every((reason) => reason.startsWith('All monitored'))) && <p className="ops-healthy-reason">All monitored telemetry is within configured thresholds.</p>}
               </div>
             </div>
           )}
