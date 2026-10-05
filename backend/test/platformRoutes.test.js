@@ -41,16 +41,15 @@ test("platform routes preserve the authenticated dashboard API contract", async 
   const dashboardResponse = await fetch(`${baseUrl}/api/dashboard`, { headers });
   assert.equal(dashboardResponse.status, 200);
   const dashboardPayload = await dashboardResponse.json();
-  assert.equal(dashboardPayload.dashboard.platforms.length, 9);
+  assert.deepEqual(dashboardPayload.dashboard.platforms, []);
 
   const platformsResponse = await fetch(`${baseUrl}/api/platforms`, { headers });
   assert.equal(platformsResponse.status, 200);
   const platformsPayload = await platformsResponse.json();
-  assert.deepEqual(platformsPayload.platforms.map(({ id }) => id), dashboardPayload.dashboard.platforms.map(({ id }) => id));
+  assert.deepEqual(platformsPayload.platforms, []);
 
   const platformResponse = await fetch(`${baseUrl}/api/platform/iga`, { headers });
-  assert.equal(platformResponse.status, 200);
-  assert.equal((await platformResponse.json()).platform.id, "iga");
+  assert.equal(platformResponse.status, 404);
 
   const missingPlatformResponse = await fetch(`${baseUrl}/api/platform/not-found`, { headers });
   assert.equal(missingPlatformResponse.status, 404);

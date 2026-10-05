@@ -1,81 +1,49 @@
-const { createDashboardState } = require("../utils/platformHealth");
-
-const BASELINE_NAME = "cs-asop-platform-baseline";
-
-function createDashboardService({ PlatformState, mongoose }) {
-  const defaultBaseline = createDashboardState({ platforms: [] }, 0);
-  let tick = 0;
-  let latest = null;
-
-  function deepClone(value) {
-    return JSON.parse(JSON.stringify(value));
-  }
-
-  async function loadBaselineState() {
-    if (mongoose.connection.readyState !== 1) {
-      return deepClone(defaultBaseline);
-    }
-
-    const existing = await PlatformState.findOne({ name: BASELINE_NAME }).lean();
-    if (existing?.platforms?.length === 9 && existing.platforms.every((platform) => platform.instances?.length === 10)) {
-      return existing;
-    }
-
-    const created = await PlatformState.create({ ...defaultBaseline, name: BASELINE_NAME });
-    return created.toObject();
-  }
-
-  async function persistDashboard(snapshot) {
-    if (mongoose.connection.readyState !== 1) {
-      return snapshot;
-    }
-
-    const result = await PlatformState.findOneAndUpdate(
-      { name: BASELINE_NAME },
-      {
-        $set: {
-          platforms: snapshot.platforms,
-          security: snapshot.security,
-          summary: snapshot.summary,
-          updatedAt: snapshot.updatedAt,
-        },
-      },
-      { upsert: true, new: true },
-    );
-
-    return result.toObject();
-  }
-
-  function generateDashboardSnapshot(previousSnapshot = defaultBaseline) {
-    tick += 1;
-    return createDashboardState(previousSnapshot, tick);
-  }
-
-  async function bootstrap() {
-    const baseline = await loadBaselineState();
-    latest = await persistDashboard(generateDashboardSnapshot(baseline));
-    return latest;
-  }
-
-  async function update() {
-    if (!latest) {
-      return bootstrap();
-    }
-
-    latest = await persistDashboard(generateDashboardSnapshot(latest));
-    return latest;
-  }
+function createDashboardService() {
+  const emptyDashboard = {
+    name: "cs-asop-platform-baseline",
+    platforms: [],
+    security: {
+      sessionsBypassingPAM: 0,
+      outOfHoursAccess: 0,
+      failedLogins: 0,
+      blockedThreats: 0,
+      exposure: [],
+    },
+    summary: {
+      overallHealth: "healthy",
+      onlineNodes: 0,
+      warningNodes: 0,
+      criticalNodes: 0,
+      totalPlatforms: 0,
+      healthyPlatforms: 0,
+      warningPlatforms: 0,
+      criticalPlatforms: 0,
+      totalInstances: 0,
+      healthyInstances: 0,
+      warningInstances: 0,
+      criticalInstances: 0,
+    },
+    updatedAt: null,
+  };
 
   function getDashboard() {
-    return latest || defaultBaseline;
+    return emptyDashboard;
   }
 
   function getPlatforms() {
-    return getDashboard().platforms;
+    return emptyDashboard.platforms;
   }
 
-  function getPlatform(platformId) {
-    return getPlatforms().find((platform) => platform.id === platformId) || null;
+  function getPlatform() {
+    return null;
+  }
+
+  async function bootstrap() {
+    return getDashboard();
+  }
+
+  async function update() {
+    return getDashboard();
   }
 
   return { bootstrap, getDashboard, getPlatform, getPlatforms, update };

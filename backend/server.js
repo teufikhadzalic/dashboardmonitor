@@ -4,7 +4,6 @@ const cors = require("cors");
 const mongoose = require("mongoose");
 require("dotenv").config();
 const { Server } = require("socket.io");
-const PlatformState = require("./models/PlatformState");
 const authRoutes = require("./routes/auth");
 const adminRoutes = require("./routes/admin");
 const { requireAuth, verifyToken } = require("./middleware/auth");
@@ -23,25 +22,8 @@ const io = new Server(server, {
 });
 
 const PORT = Number(process.env.PORT) || 3000;
-const tickMs = 3000;
-const dashboardService = createDashboardService({ PlatformState, mongoose });
+const dashboardService = createDashboardService();
 const platformController = createPlatformController(dashboardService);
-
-async function bootstrapSimulation() {
-  const snapshot = await dashboardService.bootstrap();
-  io.emit("dashboard:update", snapshot);
-  return snapshot;
-}
-
-async function tickSimulation() {
-  try {
-    const snapshot = await dashboardService.update();
-    io.emit("dashboard:update", snapshot);
-    return snapshot;
-  } catch (error) {
-    console.error("Simulation tick failed:", error);
-  }
-}
 
 app.use(cors());
 app.use(express.json());
@@ -98,8 +80,6 @@ async function startServer() {
   }
 
   await bootstrapSuperuser();
-  await bootstrapSimulation();
-  setInterval(() => tickSimulation(), tickMs);
 
   server.listen(PORT, () => {
     console.log(`CS-ASOP dashboard API listening on http://localhost:${PORT}`);
@@ -110,4 +90,4 @@ if (require.main === module) {
   startServer();
 }
 
-module.exports = { app, server, io, tickSimulation, bootstrapSimulation };
+module.exports = { app, server, io };
