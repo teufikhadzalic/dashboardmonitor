@@ -8,7 +8,10 @@ const PlatformState = require("./models/PlatformState");
 const authRoutes = require("./routes/auth");
 const adminRoutes = require("./routes/admin");
 const { requireAuth, verifyToken } = require("./middleware/auth");
-const { createDashboardState } = require("./utils/platformHealth");
+const { bootstrapSuperuser } = require("./utils/bootstrapAdmin");
+const { createDashboardService } = require("./services/dashboardService");
+const { createPlatformController } = require("./controllers/platformController");
+const { createPlatformRoutes } = require("./routes/platformRoutes");
 
 const app = express();
 const server = http.createServer(app);
@@ -21,72 +24,20 @@ const io = new Server(server, {
 
 const PORT = Number(process.env.PORT) || 3000;
 const tickMs = 3000;
-
-const state = { tick: 0, latest: null };
-const defaultBaseline = createDashboardState({ platforms: [] }, 0);
-
-function deepClone(value) {
-  return JSON.parse(JSON.stringify(value));
-}
-
-async function loadBaselineState() {
-  if (mongoose.connection.readyState !== 1) {
-    return deepClone(defaultBaseline);
-  }
-
-  const existing = await PlatformState.findOne({ name: "cs-asop-platform-baseline" }).lean();
-  if (existing?.platforms?.length === 9 && existing.platforms.every((platform) => platform.instances?.length === 10)) {
-    return existing;
-  }
-
-  const created = await PlatformState.create(defaultBaseline);
-  return created.toObject();
-}
-
-function generateDashboardSnapshot(previousSnapshot = defaultBaseline) {
-  state.tick += 1;
-  const next = createDashboardState(previousSnapshot, state.tick);
-  return next;
-}
-
-async function persistDashboard(snapshot) {
-  if (mongoose.connection.readyState !== 1) {
-    return snapshot;
-  }
-
-  const result = await PlatformState.findOneAndUpdate(
-    { name: "cs-asop-platform-baseline" },
-    {
-      $set: {
-        platforms: snapshot.platforms,
-        security: snapshot.security,
-        summary: snapshot.summary,
-        updatedAt: snapshot.updatedAt,
-      },
-    },
-    { upsert: true, new: true }
-  );
-
-  return result.toObject();
-}
+const dashboardService = createDashboardService({ PlatformState, mongoose });
+const platformController = createPlatformController(dashboardService);
 
 async function bootstrapSimulation() {
-  const baseline = await loadBaselineState();
-  state.latest = generateDashboardSnapshot(baseline);
-  state.latest = await persistDashboard(state.latest);
-  io.emit("dashboard:update", state.latest);
+  const snapshot = await dashboardService.bootstrap();
+  io.emit("dashboard:update", snapshot);
+  return snapshot;
 }
 
 async function tickSimulation() {
   try {
-    if (!state.latest) {
-      await bootstrapSimulation();
-      return;
-    }
-
-    const nextSnapshot = generateDashboardSnapshot(state.latest);
-    state.latest = await persistDashboard(nextSnapshot);
-    io.emit("dashboard:update", state.latest);
+    const snapshot = await dashboardService.update();
+    io.emit("dashboard:update", snapshot);
+    return snapshot;
   } catch (error) {
     console.error("Simulation tick failed:", error);
   }
@@ -96,28 +47,10 @@ app.use(cors());
 app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api", createPlatformRoutes(platformController, requireAuth));
 
 app.get("/api/health", (req, res) => {
   res.json({ service: "cs-asop-dashboard-api", status: "ok", timestamp: new Date().toISOString() });
-});
-
-app.get("/api/dashboard", requireAuth, (req, res) => {
-  const snapshot = state.latest || defaultBaseline;
-  res.json({ dashboard: snapshot });
-});
-
-app.get("/api/platforms", requireAuth, (req, res) => {
-  const snapshot = state.latest || defaultBaseline;
-  res.json({ platforms: snapshot.platforms });
-});
-
-app.get("/api/platform/:id", requireAuth, (req, res) => {
-  const platform = (state.latest?.platforms || defaultBaseline.platforms).find((entry) => entry.id === req.params.id);
-  if (!platform) {
-    return res.status(404).json({ error: "Platform not found" });
-  }
-
-  return res.json({ platform });
 });
 
 app.use((req, res) => {
@@ -132,8 +65,9 @@ app.use((error, req, res, next) => {
 io.on("connection", (socket) => {
   console.log("Client connected to CS-ASOP stream");
 
-  if (state.latest) {
-    socket.emit("dashboard:update", state.latest);
+  const dashboard = dashboardService.getDashboard();
+  if (dashboard) {
+    socket.emit("dashboard:update", dashboard);
   }
 
   socket.on("disconnect", () => {
@@ -163,6 +97,7 @@ async function startServer() {
     console.warn("MONGODB_URI is not set; using in-memory simulation state.");
   }
 
+  await bootstrapSuperuser();
   await bootstrapSimulation();
   setInterval(() => tickSimulation(), tickMs);
 

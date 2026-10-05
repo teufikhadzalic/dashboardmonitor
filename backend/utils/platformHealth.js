@@ -1,104 +1,6 @@
-const PLATFORM_DEFINITIONS = [
-  {
-    id: 'iga',
-    shortName: 'IGA',
-    name: 'Identity Governance & Administration',
-    role: 'Identity Governance',
-    services: [
-      { id: 'identity-sync', name: 'identity sync' },
-      { id: 'entitlement-calc', name: 'entitlement calc' },
-    ],
-    securityMetrics: ['failedAuthentication', 'provisioningFailures', 'syncFailures', 'accessReviewCoverage'],
-  },
-  {
-    id: 'pam',
-    shortName: 'PAM',
-    name: 'Privileged Access Management',
-    role: 'Privileged Access',
-    services: [
-      { id: 'vault-rotation', name: 'vault rotation' },
-      { id: 'just-in-time', name: 'just-in-time approvals' },
-    ],
-    securityMetrics: ['bypassAttempts', 'breakGlassSessions', 'outOfHoursAccess', 'credentialRotationFailures'],
-  },
-  {
-    id: 'mfa',
-    shortName: 'MFA',
-    name: 'Multi-Factor Authentication',
-    role: 'Authentication',
-    services: [
-      { id: 'otp-issuer', name: 'otp issuer' },
-      { id: 'push-verify', name: 'push verification' },
-    ],
-    securityMetrics: ['authenticationAttempts', 'authenticationFailures', 'bypassAttempts', 'pushFatigueEvents'],
-  },
-  {
-    id: 'ad-entra',
-    shortName: 'AD / Entra',
-    name: 'Active Directory / Entra',
-    role: 'Directory Services',
-    services: [
-      { id: 'ldap-replication', name: 'ldap replication' },
-      { id: 'group-sync', name: 'group sync' },
-    ],
-    securityMetrics: ['authenticationFailures', 'replicationFailures', 'groupSyncFailures', 'directoryAvailability'],
-  },
-  {
-    id: 'sase',
-    shortName: 'SASE',
-    name: 'Secure Access Service Edge',
-    role: 'Secure Edge',
-    services: [
-      { id: 'ztna-gateway', name: 'ztna gateway' },
-      { id: 'proxy-policy', name: 'proxy policy' },
-    ],
-    securityMetrics: ['activeSessions', 'authenticationFailures', 'policyDenies', 'connectionFailures'],
-  },
-  {
-    id: 'siem',
-    shortName: 'SIEM',
-    name: 'Security Information & Event Management',
-    role: 'Detection & Correlation',
-    services: [
-      { id: 'splunkd-indexing', name: 'splunkd — indexing' },
-      { id: 'rule-engine', name: 'rule engine' },
-    ],
-    securityMetrics: ['eventsPerSecond', 'ingestionLag', 'logSourcesOnline', 'parserFailures'],
-  },
-  {
-    id: 'tip',
-    shortName: 'TIP',
-    name: 'Threat Intelligence Platform',
-    role: 'Threat Intelligence',
-    services: [
-      { id: 'intel-ingest', name: 'intel ingest' },
-      { id: 'feed-correlation', name: 'feed correlation' },
-    ],
-    securityMetrics: ['feedIngestionFailures', 'staleFeeds', 'indicatorCount', 'feedAvailability'],
-  },
-  {
-    id: 'soar',
-    shortName: 'SOAR',
-    name: 'Security Orchestration, Automation & Response',
-    role: 'Automation & Response',
-    services: [
-      { id: 'playbook-runner', name: 'playbook runner' },
-      { id: 'ticketing-loop', name: 'ticketing loop' },
-    ],
-    securityMetrics: ['playbooksExecuted', 'successfulPlaybooks', 'failedPlaybooks', 'executionLatency'],
-  },
-  {
-    id: 'ansible',
-    shortName: 'Ansible',
-    name: 'Ansible Automation',
-    role: 'Hardening & Patch',
-    services: [
-      { id: 'patch-runner', name: 'patch runner' },
-      { id: 'hardening-policy', name: 'hardening policy' },
-    ],
-    securityMetrics: ['successfulJobs', 'failedJobs', 'pendingJobs', 'patchCompliance'],
-  },
-];
+const { PLATFORM_DEFINITIONS } = require('../data/platformDefinitions');
+
+
 
 const AGGREGATION_THRESHOLDS = {
   // Boundary values belong to the lower severity: 70 is warning, 80 is warning, and only values above 80 are critical.
@@ -107,7 +9,6 @@ const AGGREGATION_THRESHOLDS = {
   latency: { warning: 100, critical: 200 },
   errorRate: { warning: 1, critical: 5 },
   diskUsage: { warning: 80, critical: 92 },
-  serviceStatus: { online: 'healthy', degraded: 'warning', offline: 'critical' },
   security: {
     pamBypass: { warning: 4, critical: 6 },
     outOfHoursAccess: { warning: 20, critical: 30 },
@@ -178,10 +79,8 @@ function createInstanceHealthReasons(instance) {
     }
   }
 
-  if (instance.serviceStatus === 'offline') {
-    reasons.push('Service is offline.');
-  } else if (instance.serviceStatus === 'degraded') {
-    reasons.push('Service is degraded.');
+  if (instance.serviceStatus === 'down') {
+    reasons.push(`Service unavailable: ${instance.serviceStatusReason || 'Availability check failed.'}`);
   }
 
   return reasons.length ? reasons : ['All monitored telemetry is within configured thresholds'];
@@ -198,8 +97,7 @@ function evaluateInstanceHealth(instance) {
     }
   }
 
-  if (instance.serviceStatus === 'offline') severities.push('critical');
-  else if (instance.serviceStatus === 'degraded') severities.push('warning');
+  if (instance.serviceStatus === 'down') severities.push('critical');
 
   const status = severities.includes('critical') ? 'critical' : severities.includes('warning') ? 'warning' : 'healthy';
 
@@ -211,8 +109,11 @@ function evaluateInstanceHealth(instance) {
 
 function generateInstanceTelemetry(platform, index, previousInstance = null, tick = 0) {
   const salt = tick * 17 + index * 11 + platform.id.length * 3;
-  const serviceStatusSeed = previousInstance?.serviceStatus || 'online';
-  const serviceStatus = serviceStatusSeed === 'offline' && (index + tick) % 9 === 0 ? 'online' : 'online';
+  const scheduledDown = (platform.id === 'siem' && index === 4 && tick % 5 < 2)
+    || (platform.id === 'ansible' && index === 8 && tick % 7 === 0);
+  const serviceStatus = scheduledDown ? 'down' : 'up';
+  const serviceStatusReason = scheduledDown ? 'Service endpoint unreachable' : 'HTTP health check successful';
+  const availabilityCheck = scheduledDown ? 'HTTP health check' : 'HTTP health check';
 
   const baseCpu = platform.id === 'siem' ? 63 : platform.id === 'pam' ? 58 : platform.id === 'soar' ? 61 : 48;
   const baseMemory = platform.id === 'ad-entra' ? 62 : platform.id === 'sase' ? 60 : 55;
@@ -344,6 +245,8 @@ function generateInstanceTelemetry(platform, index, previousInstance = null, tic
     networkThroughput,
     lastRestart: new Date(Date.now() - (uptime * 60 * 60 * 1000)).toISOString(),
     serviceStatus,
+    serviceStatusReason,
+    availabilityCheck,
     metrics,
   };
 
@@ -429,6 +332,8 @@ function evaluatePlatformHealth(platform) {
   const healthyInstances = evaluatedInstances.filter((instance) => instance.status === 'healthy').length;
   const warningInstances = evaluatedInstances.filter((instance) => instance.status === 'warning').length;
   const criticalInstances = evaluatedInstances.filter((instance) => instance.status === 'critical').length;
+  const upInstances = instances.filter((instance) => instance.serviceStatus !== 'down').length;
+  const downInstances = instances.filter((instance) => instance.serviceStatus === 'down').length;
 
   const problematicInstances = evaluatedInstances.filter((instance) => instance.status !== 'healthy');
   const instanceReasons = problematicInstances.flatMap((instance) =>
@@ -436,7 +341,7 @@ function evaluatePlatformHealth(platform) {
       .filter((reason) => !reason.startsWith('All monitored'))
       .map((reason) => `${instance.id} ${reason}`),
   );
-  const criticalReasons = instanceReasons.filter((reason) => reason.includes('critical threshold') || reason.includes('offline'));
+  const criticalReasons = instanceReasons.filter((reason) => reason.includes('critical threshold') || reason.includes('unavailable'));
   const warningReasons = instanceReasons.filter((reason) => !criticalReasons.includes(reason));
 
   const status = criticalInstances > 0 ? 'critical' : warningInstances > 0 ? 'warning' : 'healthy';
@@ -448,6 +353,8 @@ function evaluatePlatformHealth(platform) {
     healthyInstances,
     warningInstances,
     criticalInstances,
+    upInstances,
+    downInstances,
     totalInstances: instances.length,
     cpu: Number(average(evaluatedInstances.map((instance) => instance.cpu)).toFixed(1)),
     memory: Number(average(evaluatedInstances.map((instance) => instance.memory)).toFixed(1)),
@@ -466,15 +373,11 @@ function evaluatePlatformHealth(platform) {
 }
 
 function evaluateServiceHealth(service, serviceIndex, platformId) {
-  const cpu = Number(service.cpu || 35);
-  const memory = Number(service.memory || 25);
-  const baseStatus = cpu >= 75 || memory >= 85 ? 'down' : cpu >= 55 || memory >= 70 ? 'deg' : 'up';
-
   return {
     ...service,
-    status: baseStatus,
-    cpu: clamp(cpu, 10, 96),
-    memory: clamp(memory, 10, 90),
+    status: service.status === 'down' ? 'down' : 'up',
+    statusReason: service.statusReason || 'HTTP health check successful',
+    checkType: service.checkType || 'HTTP health check',
     uptime: Number((service.uptime || 24).toFixed(1)),
   };
 }
@@ -554,19 +457,21 @@ function createDashboardState(previousDashboard = { platforms: [] }, tick = 0) {
         base.memory = 82;
         base.latency = 75;
         base.errorRate = 0.8;
-        base.serviceStatus = 'online';
+        base.serviceStatus = 'up';
       }
       if (platformIndex === 0 && index === 1) {
         base.cpu = 76;
         base.memory = 61;
         base.latency = 43;
         base.errorRate = 0.4;
-        base.serviceStatus = 'online';
+        base.serviceStatus = 'up';
       }
       if (platformIndex === 1 && index === 3) {
         base.cpu = 92;
         base.memory = 60;
-        base.serviceStatus = 'offline';
+        base.serviceStatus = 'down';
+        base.serviceStatusReason = 'Connection refused';
+        base.availabilityCheck = 'TCP connection';
         base.metrics.bypassAttempts = 12;
       }
       if (platformIndex === 5 && index === 4) {
@@ -592,15 +497,13 @@ function createDashboardState(previousDashboard = { platforms: [] }, tick = 0) {
         name: service.name,
         instanceId: sourceInstance.id,
         status: 'up',
+        statusReason: sourceInstance.serviceStatusReason,
+        checkType: sourceInstance.availabilityCheck,
         cpu: sourceInstance.cpu,
         memory: sourceInstance.memory,
         uptime: sourceInstance.uptime,
       }, index, platformDefinition.id);
-      serviceObject.status = sourceInstance.serviceStatus === 'offline'
-        ? 'down'
-        : sourceInstance.serviceStatus === 'degraded' || sourceInstance.status === 'warning'
-          ? 'deg'
-          : 'up';
+      serviceObject.status = sourceInstance.serviceStatus;
       return serviceObject;
     });
 

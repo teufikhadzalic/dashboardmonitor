@@ -15,7 +15,7 @@ test('healthy telemetry stays healthy', () => {
     latency: 50,
     errorRate: 0.5,
     diskUsage: 60,
-    serviceStatus: 'online',
+    serviceStatus: 'up',
     metrics: {},
   };
 
@@ -31,7 +31,7 @@ test('warning thresholds do not upgrade to critical without a critical metric', 
     latency: 50,
     errorRate: 0.5,
     diskUsage: 60,
-    serviceStatus: 'online',
+    serviceStatus: 'up',
     metrics: {},
   });
   assert.equal(warning.status, 'warning');
@@ -43,7 +43,7 @@ test('warning thresholds do not upgrade to critical without a critical metric', 
     latency: 150,
     errorRate: 0.5,
     diskUsage: 60,
-    serviceStatus: 'online',
+    serviceStatus: 'up',
     metrics: {},
   });
   assert.equal(latencyOnly.status, 'warning');
@@ -55,7 +55,7 @@ test('warning thresholds do not upgrade to critical without a critical metric', 
     latency: 50,
     errorRate: 0.5,
     diskUsage: 60,
-    serviceStatus: 'online',
+    serviceStatus: 'up',
     metrics: {},
   });
   assert.equal(critical.status, 'critical');
@@ -63,13 +63,13 @@ test('warning thresholds do not upgrade to critical without a critical metric', 
 });
 
 test('prototype threshold boundaries are consistent', () => {
-  const atWarningBoundary = evaluateInstanceHealth({ cpu: 70, memory: 75, latency: 100, errorRate: 1, serviceStatus: 'online' });
+  const atWarningBoundary = evaluateInstanceHealth({ cpu: 70, memory: 75, latency: 100, errorRate: 1, serviceStatus: 'up' });
   assert.equal(atWarningBoundary.status, 'warning');
 
-  const atCriticalBoundary = evaluateInstanceHealth({ cpu: 80, memory: 85, latency: 200, errorRate: 5, serviceStatus: 'online' });
+  const atCriticalBoundary = evaluateInstanceHealth({ cpu: 80, memory: 85, latency: 200, errorRate: 5, serviceStatus: 'up' });
   assert.equal(atCriticalBoundary.status, 'warning');
 
-  const aboveCriticalBoundary = evaluateInstanceHealth({ cpu: 80.1, memory: 85.1, latency: 200.1, errorRate: 5.1, serviceStatus: 'online' });
+  const aboveCriticalBoundary = evaluateInstanceHealth({ cpu: 80.1, memory: 85.1, latency: 200.1, errorRate: 5.1, serviceStatus: 'up' });
   assert.equal(aboveCriticalBoundary.status, 'critical');
 });
 
@@ -82,7 +82,7 @@ test('platform health is derived from instance health and not average metrics al
     latency: 50,
     errorRate: 0.5,
     diskUsage: 60,
-    serviceStatus: 'online',
+    serviceStatus: 'up',
     metrics: {},
     reasons: index === 6 ? ['SOAR-07 CPU utilization exceeds critical threshold.'] : ['All monitored telemetry is within configured thresholds'],
   }));
@@ -106,8 +106,8 @@ test('platform health is derived from instance health and not average metrics al
 test('critical platform reasons identify critical conditions first', () => {
   const platform = evaluatePlatformHealth({
     instances: [
-      { id: 'PAM-01', cpu: 75, memory: 60, latency: 50, errorRate: 0.2, diskUsage: 60, serviceStatus: 'online' },
-      { id: 'PAM-02', cpu: 92, memory: 60, latency: 50, errorRate: 0.2, diskUsage: 60, serviceStatus: 'online' },
+      { id: 'PAM-01', cpu: 75, memory: 60, latency: 50, errorRate: 0.2, diskUsage: 60, serviceStatus: 'up' },
+      { id: 'PAM-02', cpu: 92, memory: 60, latency: 50, errorRate: 0.2, diskUsage: 60, serviceStatus: 'up' },
     ],
   });
 
@@ -161,7 +161,7 @@ test('service status follows its source instance condition', () => {
   assert.equal(service.cpu, sourceInstance.cpu);
   assert.equal(service.memory, sourceInstance.memory);
   assert.equal(service.uptime, sourceInstance.uptime);
-  assert.equal(service.status, sourceInstance.status === 'healthy' ? 'up' : 'deg');
+  assert.equal(service.status, sourceInstance.serviceStatus);
 });
 
 test('health thresholds are centralized in one config object', () => {

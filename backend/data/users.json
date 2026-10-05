@@ -30,5 +30,21 @@
     "password": "$2b$10$F/YszlUoonCO73cwyVTeyeuD4d4gNZkW/2aAAWD5cceFokKJUxTW.",
     "role": "user",
     "status": "approved"
+  },
+  {
+    "id": "memory-1790573418507",
+    "name": "Admintest",
+    "email": "admintest@example.com",
+    "password": "$2b$10$hbtrwTOtPhly7RwQCYMRv.xReE8kyYL0M.wwj6zNcxn5HCBd8ykQ2",
+    "role": "admin",
+    "status": "approved"
+  },
+  {
+    "id": "memory-1790573593198",
+    "name": "reguler1",
+    "email": "reguler1@example.com",
+    "password": "$2b$10$GPkUeij/jNlcv6ZIqsNuee3Hxf0Q.yxc2YaL.TE2I8mQ9gr/tMuBu",
+    "role": "user",
+    "status": "pending"
   }
 ]
