@@ -76,13 +76,27 @@ const platforms = [
   status: "UP",
   instances: Array.from({ length: 10 }, (_, index) => {
     const number = String(index + 1).padStart(2, "0");
+    const locations = [
+      { datacenter: "DC-JKT-01", region: "Jakarta", zone: "A" },
+      { datacenter: "DC-JKT-02", region: "Jakarta", zone: "B" },
+      { datacenter: "DC-SBY-01", region: "Surabaya", zone: "A" },
+    ];
+    const location = locations[index % locations.length];
+    const os = index % 4 === 0
+      ? { os: "Red Hat Enterprise Linux", osVersion: "9.4", architecture: "x86_64" }
+      : { os: "Ubuntu", osVersion: "22.04 LTS", architecture: "x86_64" };
+    const uptime = Number((18 + (index % 9) * 2.1).toFixed(1));
     return {
       id: `${platform.shortName}-${number}`,
       platform: platform.id,
       status: "UP",
       hostname: `${platform.id}-prod-${number}`,
-      region: index % 3 === 2 ? "Surabaya" : "Jakarta",
+      ipAddress: `10.20.${platform.id.length}.${index + 10}`,
+      ...os,
+      ...location,
       environment: index === 9 ? "Staging" : "Production",
+      uptime,
+      lastRestart: new Date(Date.now() - uptime * 60 * 60 * 1000).toISOString(),
     };
   }),
 }));

@@ -44,6 +44,11 @@ test("platform API provides platform, instance, and generated telemetry JSON", a
   assert.ok(Number.isFinite(Date.parse(telemetry[0].timestamp)));
   assert.ok(telemetry[0].cpu_current >= 10 && telemetry[0].cpu_current <= 95);
   assert.ok(telemetry[0].cpu_average >= 10 && telemetry[0].cpu_average <= 95);
+  assert.ok(Number.isFinite(telemetry[0].latency));
+  assert.ok(Number.isFinite(telemetry[0].error_rate));
+  assert.ok(Number.isFinite(telemetry[0].security_metrics.bypassAttempts));
+  assert.ok(instances[0].ipAddress);
+  assert.ok(instances[0].os);
 
   const missingResponse = await fetch(`${baseUrl}/api/platforms/missing`);
   assert.equal(missingResponse.status, 404);

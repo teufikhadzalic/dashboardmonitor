@@ -54,7 +54,19 @@ Example telemetry response:
       "cpu_average": 48.7,
       "memory_current": 54.3,
       "memory_average": 54.3,
-      "availability": 99.94
+      "latency": 44.2,
+      "disk_usage": 55.8,
+      "error_rate": 0.4,
+      "request_rate": 680,
+      "active_connections": 100,
+      "network_throughput": 60,
+      "availability": 99.94,
+      "security_metrics": {
+        "bypassAttempts": 2,
+        "outOfHoursAccess": 3,
+        "authenticationFailures": 2,
+        "policyDenies": 4
+      }
     }
   ]
 }
@@ -72,6 +84,6 @@ The intended development request flow is:
 Frontend -> Main Backend -> Mock Data API -> Generated Mock Telemetry
 ```
 
-The frontend should communicate with the main backend, not this application directly. The main backend is not connected to this API yet; that HTTP integration is a separate step. Later, the backend can replace this mock external API with the real cybersecurity API without requiring the frontend to communicate with either external service.
+The frontend communicates with the main backend, not this application directly. The main backend consumes this API over HTTP and adapts its records to the existing dashboard model. Later, the backend can replace this mock external API with the real cybersecurity API without requiring the frontend to communicate with either external service.
 
-The existing backend's internal mock telemetry generation and serving were disabled for this step. Its generator implementation remains in place as reference, but the backend now returns an empty dashboard snapshot until its data source is integrated with this standalone API.
+The existing backend's internal mock telemetry generation remains disabled. Its previous generator implementation remains in place as reference.

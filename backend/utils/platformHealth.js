@@ -559,6 +559,7 @@ module.exports = {
   evaluatePlatformHealth,
   buildDashboardSecurity,
   buildDashboardSummary,
+  buildPlatformSecurityValues,
   generateInstanceTelemetry,
   evaluateServiceHealth,
 };
